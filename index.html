@@ -38,7 +38,7 @@
         .simulator-chart-container {
             position: relative;
             width: 100%;
-            max-width: 900px;
+            max-width: 1000px;
             margin-left: auto;
             margin-right: auto;
             height: 45vh;
@@ -195,61 +195,112 @@
                     <section class="bg-white p-6 rounded-xl shadow-md border border-gray-100">
                         <h2 class="text-2xl font-semibold mb-4 text-gray-900">Budget Simulator</h2>
                         <p class="text-base text-gray-700 mb-6">
-                            Use this tool to project your future savings. We've started with your current monthly averages calculated from your transaction data. Adjust the values for your income or spending categories to see how those changes might affect your financial future over the next 24 months.
+                            Use this tool to project your future savings. Set up two different scenarios ("A" and "B") to compare their long-term impact. Adjust the global projection settings to see how savings accumulate weekly, monthly, or yearly.
                         </p>
-                        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                            <div class="lg:col-span-1 space-y-6">
-                                <div class="flex justify-between items-center">
-                                    <h3 class="text-xl font-semibold text-gray-800">Adjust Your Monthly Budget</h3>
-                                    <button id="resetSimulatorBtn" class="py-1 px-3 bg-gray-200 text-gray-700 rounded-md text-sm font-medium hover:bg-gray-300">
-                                        Reset
-                                    </button>
-                                </div>
-                                <div>
-                                    <label for="simInitialSavings" class="block text-sm font-medium text-gray-700">Starting Savings (€)</label>
-                                    <input type="number" id="simInitialSavings" value="0" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
-                                </div>
-                                <div>
-                                    <label for="simIncome" class="block text-sm font-medium text-gray-700">Monthly Income (€)</label>
-                                    <div class="flex items-center space-x-2">
-                                        <input type="range" id="simIncomeRange" min="0" max="10000" step="100" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
-                                        <input type="number" id="simIncome" class="w-28 p-2 border border-gray-300 rounded-md shadow-sm">
-                                    </div>
-                                </div>
-
-                                <h4 class="text-lg font-semibold text-gray-800 pt-4">Monthly Expenses</h4>
-                                <div id="simExpenseInputs" class="space-y-4">
-                                </div>
-
-                                <div>
-                                    <label for="simMonths" class="block text-sm font-medium text-gray-700">Projection Length (Months)</label>
-                                    <div class="flex items-center space-x-2">
-                                        <input type="range" id="simMonthsRange" min="6" max="36" step="1" value="24" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
-                                        <input type="number" id="simMonths" value="24" class="w-28 p-2 border border-gray-300 rounded-md shadow-sm">
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="lg:col-span-2">
+                        
+                        <div class="grid grid-cols-1 gap-8">
+                            <div>
                                 <h3 class="text-xl font-semibold text-gray-800 mb-4">Projected Savings</h3>
                                 <div class="bg-blue-50 border border-blue-200 text-blue-800 p-4 rounded-lg mb-4">
-                                    <p class="font-medium">Baseline vs. Simulated</p>
-                                    <p class="text-sm">The "Baseline" projection (dashed line) uses your original monthly averages. The "Simulated" projection (solid line) updates live as you change the values on the left.</p>
+                                    <p class="font-medium">Scenario A vs. Scenario B</p>
+                                    <p class="text-sm">"Scenario A" (solid line) and "Scenario B" (dashed line) update live as you change their respective values below.</p>
                                 </div>
                                 <div class="simulator-chart-container">
                                     <canvas id="simulatorChart"></canvas>
                                 </div>
-                                <div class="mt-6 grid grid-cols-2 gap-4">
-                                    <div class="bg-gray-100 p-4 rounded-lg">
-                                        <h4 class="text-sm font-medium text-gray-500">Simulated Monthly Savings</h4>
-                                        <p id="simMonthlySavings" class="text-2xl font-bold text-blue-700">€0.00</p>
+                            </div>
+
+                            <div class="bg-white p-6 rounded-xl shadow-md border border-gray-100">
+                                <h3 class="text-xl font-semibold text-gray-800 mb-4">Projection Settings</h3>
+                                <div class_ ="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <label for="simPeriodUnit" class="block text-sm font-medium text-gray-700">Simulation Period</label>
+                                        <select id="simPeriodUnit" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm bg-white">
+                                            <option value="weekly">Weekly</option>
+                                            <option value="monthly" selected>Monthly</option>
+                                            <option value="yearly">Yearly</option>
+                                        </select>
                                     </div>
-                                    <div class="bg-gray-100 p-4 rounded-lg">
-                                        <h4 class="text-sm font-medium text-gray-500">Simulated Total After <span id="simMonthsDisplay">24</span> Months</h4>
-                                        <p id="simTotalSavings" class="text-2xl font-bold text-blue-700">€0.00</p>
+                                    <div>
+                                        <label for="simLength" id="simLengthLabel" class="block text-sm font-medium text-gray-700">Projection Length (Months)</label>
+                                        <div class="flex items-center space-x-2">
+                                            <input type="range" id="simLengthRange" min="6" max="36" step="1" value="24" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                                            <input type="number" id="simLength" value="24" class="w-28 p-2 border border-gray-300 rounded-md shadow-sm">
+                                        </div>
                                     </div>
                                 </div>
                             </div>
+
+                            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                                <!-- Scenario A -->
+                                <div class="space-y-6 p-6 bg-gray-50 rounded-lg border">
+                                    <div class="flex justify-between items-center">
+                                        <h3 class="text-xl font-semibold text-blue-700">Scenario A</h3>
+                                        <button id="resetSimulatorBtnA" class="py-1 px-3 bg-gray-200 text-gray-700 rounded-md text-sm font-medium hover:bg-gray-300">
+                                            Reset
+                                        </button>
+                                    </div>
+                                    <div>
+                                        <label for="simInitialSavingsA" class="block text-sm font-medium text-gray-700">Starting Savings (€)</label>
+                                        <input type="number" id="simInitialSavingsA" value="0" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                                    </div>
+                                    <div>
+                                        <label for="simIncomeA" class="block text-sm font-medium text-gray-700">Income (per period)</label>
+                                        <div class="flex items-center space-x-2">
+                                            <input type="range" id="simIncomeRangeA" min="0" max="10000" step="100" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                                            <input type="number" id="simIncomeA" class="w-28 p-2 border border-gray-300 rounded-md shadow-sm">
+                                        </div>
+                                    </div>
+                                    <h4 class="text-lg font-semibold text-gray-800 pt-4">Expenses (per period)</h4>
+                                    <div id="simExpenseInputsA" class="space-y-4"></div>
+                                    
+                                    <div class="mt-6 grid grid-cols-2 gap-4 pt-4 border-t">
+                                        <div class="bg-white p-4 rounded-lg shadow-sm">
+                                            <h4 class="text-sm font-medium text-gray-500">Net Savings (per period)</h4>
+                                            <p id="simMonthlySavingsA" class="text-2xl font-bold text-blue-700">€0.00</p>
+                                        </div>
+                                        <div class="bg-white p-4 rounded-lg shadow-sm">
+                                            <h4 class="text-sm font-medium text-gray-500">Total After <span id="simMonthsDisplayA">24</span> Periods</h4>
+                                            <p id="simTotalSavingsA" class="text-2xl font-bold text-blue-700">€0.00</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Scenario B -->
+                                <div class="space-y-6 p-6 bg-gray-50 rounded-lg border">
+                                    <div class="flex justify-between items-center">
+                                        <h3 class="text-xl font-semibold text-gray-700">Scenario B</h3>
+                                        <button id="resetSimulatorBtnB" class="py-1 px-3 bg-gray-200 text-gray-700 rounded-md text-sm font-medium hover:bg-gray-300">
+                                            Reset
+                                        </button>
+                                    </div>
+                                    <div>
+                                        <label for="simInitialSavingsB" class="block text-sm font-medium text-gray-700">Starting Savings (€)</label>
+                                        <input type="number" id="simInitialSavingsB" value="0" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                                    </div>
+                                    <div>
+                                        <label for="simIncomeB" class="block text-sm font-medium text-gray-700">Income (per period)</label>
+                                        <div class="flex items-center space-x-2">
+                                            <input type="range" id="simIncomeRangeB" min="0" max="10000" step="100" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                                            <input type="number" id="simIncomeB" class="w-28 p-2 border border-gray-300 rounded-md shadow-sm">
+                                        </div>
+                                    </div>
+                                    <h4 class="text-lg font-semibold text-gray-800 pt-4">Expenses (per period)</h4>
+                                    <div id="simExpenseInputsB" class="space-y-4"></div>
+                                    
+                                    <div class="mt-6 grid grid-cols-2 gap-4 pt-4 border-t">
+                                        <div class="bg-white p-4 rounded-lg shadow-sm">
+                                            <h4 class="text-sm font-medium text-gray-500">Net Savings (per period)</h4>
+                                            <p id="simMonthlySavingsB" class="text-2xl font-bold text-gray-700">€0.00</p>
+                                        </div>
+                                        <div class="bg-white p-4 rounded-lg shadow-sm">
+                                            <h4 class="text-sm font-medium text-gray-500">Total After <span id="simMonthsDisplayB">24</span> Periods</h4>
+                                            <p id="simTotalSavingsB" class="text-2xl font-bold text-gray-700">€0.00</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
                         </div>
                     </section>
                 </div>
@@ -323,6 +374,7 @@
         let baselineAvgIncome = 0;
         let baselineAvgExpenses = {};
         const TOP_EXPENSE_CATEGORIES_COUNT = 5;
+        const WEEKLY_DIVISOR = 4.3333;
         
         let minDate, maxDate;
         let trendChartMode = 'monthly';
@@ -429,7 +481,8 @@
             setupFilters();
             setupSimulatorInputs();
             populateDashboardData();
-            populateSimulator();
+            populateSimulator('A');
+            populateSimulator('B');
             updateSimulator();
             setupTrendChartControls();
         }
@@ -891,50 +944,87 @@
             });
         }
         
-        function setupSimulatorInputs() {
-            document.getElementById('simInitialSavings').addEventListener('input', updateSimulator);
+        function updateSimLengthControls() {
+            const unit = document.getElementById('simPeriodUnit').value;
+            const label = document.getElementById('simLengthLabel');
+            const range = document.getElementById('simLengthRange');
+            const num = document.getElementById('simLength');
             
-            const simIncome = document.getElementById('simIncome');
-            const simIncomeRange = document.getElementById('simIncomeRange');
-            simIncome.addEventListener('input', () => {
-                simIncomeRange.value = simIncome.value;
+            if (unit === 'weekly') {
+                label.innerText = 'Projection Length (Weeks)';
+                range.min = 26;
+                range.max = 156;
+                range.value = 104;
+                num.value = 104;
+            } else if (unit === 'monthly') {
+                label.innerText = 'Projection Length (Months)';
+                range.min = 6;
+                range.max = 36;
+                range.value = 24;
+                num.value = 24;
+            } else if (unit === 'yearly') {
+                label.innerText = 'Projection Length (Years)';
+                range.min = 1;
+                range.max = 3;
+                range.value = 2;
+                num.value = 2;
+            }
+            populateSimulator('A');
+            populateSimulator('B');
+            updateSimulator();
+        }
+
+        function setupSimulatorInputs() {
+            document.getElementById('simPeriodUnit').addEventListener('change', updateSimLengthControls);
+            
+            const simLength = document.getElementById('simLength');
+            const simLengthRange = document.getElementById('simLengthRange');
+            simLength.addEventListener('input', () => {
+                simLengthRange.value = simLength.value;
                 updateSimulator();
             });
-            simIncomeRange.addEventListener('input', () => {
-                simIncome.value = simIncomeRange.value;
+            simLengthRange.addEventListener('input', () => {
+                simLength.value = simLengthRange.value;
                 updateSimulator();
             });
 
-            const simMonths = document.getElementById('simMonths');
-            const simMonthsRange = document.getElementById('simMonthsRange');
-            simMonths.addEventListener('input', () => {
-                simMonthsRange.value = simMonths.value;
-                document.getElementById('simMonthsDisplay').innerText = simMonths.value;
-                updateSimulator();
-            });
-            simMonthsRange.addEventListener('input', () => {
-                simMonths.value = simMonthsRange.value;
-                document.getElementById('simMonthsDisplay').innerText = simMonthsRange.value;
-                updateSimulator();
-            });
+            document.getElementById('simInitialSavingsA').addEventListener('input', updateSimulator);
+            const simIncomeA = document.getElementById('simIncomeA');
+            const simIncomeRangeA = document.getElementById('simIncomeRangeA');
+            simIncomeA.addEventListener('input', () => { simIncomeRangeA.value = simIncomeA.value; updateSimulator(); });
+            simIncomeRangeA.addEventListener('input', () => { simIncomeA.value = simIncomeRangeA.value; updateSimulator(); });
             
-            document.getElementById('resetSimulatorBtn').addEventListener('click', () => {
-                document.getElementById('simInitialSavings').value = 0;
-                
-                document.getElementById('simMonths').value = 24;
-                document.getElementById('simMonthsRange').value = 24;
-                document.getElementById('simMonthsDisplay').innerText = 24;
-                
-                populateSimulator(); 
-                
+            document.getElementById('simInitialSavingsB').addEventListener('input', updateSimulator);
+            const simIncomeB = document.getElementById('simIncomeB');
+            const simIncomeRangeB = document.getElementById('simIncomeRangeB');
+            simIncomeB.addEventListener('input', () => { simIncomeRangeB.value = simIncomeB.value; updateSimulator(); });
+            simIncomeRangeB.addEventListener('input', () => { simIncomeB.value = simIncomeRangeB.value; updateSimulator(); });
+            
+            document.getElementById('resetSimulatorBtnA').addEventListener('click', () => {
+                document.getElementById('simInitialSavingsA').value = 0;
+                populateSimulator('A'); 
+                updateSimulator();
+            });
+            document.getElementById('resetSimulatorBtnB').addEventListener('click', () => {
+                document.getElementById('simInitialSavingsB').value = 0;
+                populateSimulator('B'); 
                 updateSimulator();
             });
         }
 
-        function populateSimulator() {
-            const simIncome = document.getElementById('simIncome');
-            const simIncomeRange = document.getElementById('simIncomeRange');
-            const avgIncome = Math.round(baselineAvgIncome);
+        function getPeriodMultiplier() {
+            const unit = document.getElementById('simPeriodUnit').value;
+            if (unit === 'weekly') return 1 / WEEKLY_DIVISOR;
+            if (unit === 'yearly') return 12;
+            return 1;
+        }
+
+        function populateSimulator(suffix) {
+            const periodMultiplier = getPeriodMultiplier();
+            const avgIncome = Math.round(baselineAvgIncome * periodMultiplier);
+
+            const simIncome = document.getElementById(`simIncome${suffix}`);
+            const simIncomeRange = document.getElementById(`simIncomeRange${suffix}`);
             simIncome.value = avgIncome;
             simIncomeRange.value = avgIncome;
             simIncomeRange.max = Math.max(10000, avgIncome * 2);
@@ -946,24 +1036,24 @@
             let otherExpenses = sortedExpenses.slice(TOP_EXPENSE_CATEGORIES_COUNT)
                 .reduce((acc, [, amount]) => acc + amount, 0);
 
-            const inputsContainer = document.getElementById('simExpenseInputs');
+            const inputsContainer = document.getElementById(`simExpenseInputs${suffix}`);
             inputsContainer.innerHTML = '';
             
-            const createExpenseInput = (id, label, value) => {
-                const avgValue = Math.round(value);
+            const createExpenseInput = (id, label, value, suffix) => {
+                const avgValue = Math.round(value * periodMultiplier);
                 const maxValue = Math.max(5000, avgValue * 3);
                 
                 const div = document.createElement('div');
                 div.innerHTML = `
-                    <label for="sim-${id}" class="block text-sm font-medium text-gray-700">${label} (€)</label>
+                    <label for="sim-${id}-${suffix}" class="block text-sm font-medium text-gray-700">${label} (€)</label>
                     <div class="flex items-center space-x-2">
-                        <input type="range" id="sim-${id}-range" min="0" max="${maxValue}" step="10" value="${avgValue}" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer expense-range">
-                        <input type="number" id="sim-${id}" value="${avgValue}" class="w-28 p-2 border border-gray-300 rounded-md shadow-sm expense-input">
+                        <input type="range" id="sim-${id}-range-${suffix}" min="0" max="${maxValue}" step="10" value="${avgValue}" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer expense-range-${suffix}">
+                        <input type="number" id="sim-${id}-${suffix}" value="${avgValue}" class="w-28 p-2 border border-gray-300 rounded-md shadow-sm expense-input-${suffix}">
                     </div>
                 `;
                 
-                const inputNum = div.querySelector(`#sim-${id}`);
-                const inputRange = div.querySelector(`#sim-${id}-range`);
+                const inputNum = div.querySelector(`#sim-${id}-${suffix}`);
+                const inputRange = div.querySelector(`#sim-${id}-range-${suffix}`);
                 
                 inputNum.addEventListener('input', () => {
                     inputRange.value = inputNum.value;
@@ -979,52 +1069,65 @@
 
             topExpenses.forEach(([category, amount]) => {
                 const id = category.toLowerCase().replace(/[^a-z0-9]/g, '');
-                inputsContainer.appendChild(createExpenseInput(id, category, amount));
+                inputsContainer.appendChild(createExpenseInput(id, category, amount, suffix));
             });
             
             if(otherExpenses > 0) {
-                 inputsContainer.appendChild(createExpenseInput('other', 'Other Expenses', otherExpenses));
+                 inputsContainer.appendChild(createExpenseInput('other', 'Other Expenses', otherExpenses, suffix));
             }
+        }
+        
+        function calculateProjection(suffix) {
+            const periodMultiplier = getPeriodMultiplier();
+            const projectionLength = parseInt(document.getElementById('simLength').value) || 24;
+
+            const initialSavings = parseFloat(document.getElementById(`simInitialSavings${suffix}`).value) || 0;
+            const income = parseFloat(document.getElementById(`simIncome${suffix}`).value) || 0;
+            
+            let totalExpenses = 0;
+            document.querySelectorAll(`.expense-input-${suffix}`).forEach(input => {
+                totalExpenses += parseFloat(input.value) || 0;
+            });
+            
+            const periodSavings = income - totalExpenses;
+            
+            let projection = [];
+            let currentSavings = initialSavings;
+            
+            for(let i = 0; i <= projectionLength; i++) {
+                if (i === 0) {
+                    projection.push(initialSavings);
+                } else {
+                    currentSavings += periodSavings;
+                    projection.push(currentSavings);
+                }
+            }
+            
+            document.getElementById(`simMonthlySavings${suffix}`).innerText = currencyFormatter.format(periodSavings);
+            document.getElementById(`simTotalSavings${suffix}`).innerText = currencyFormatter.format(currentSavings);
+            document.getElementById(`simMonthsDisplay${suffix}`).innerText = projectionLength;
+            
+            return projection;
         }
 
         function updateSimulator() {
             if (!document.getElementById('simulator')) {
                 return; 
             }
-            const initialSavings = parseFloat(document.getElementById('simInitialSavings').value) || 0;
-            const income = parseFloat(document.getElementById('simIncome').value) || 0;
-            const months = parseInt(document.getElementById('simMonths').value) || 24;
             
-            let totalExpenses = 0;
-            document.querySelectorAll('.expense-input').forEach(input => {
-                totalExpenses += parseFloat(input.value) || 0;
-            });
+            const projectionLength = parseInt(document.getElementById('simLength').value) || 24;
+            const periodUnit = document.getElementById('simPeriodUnit').value;
+            let periodLabel = "Month";
+            if (periodUnit === 'weekly') periodLabel = "Week";
+            if (periodUnit === 'yearly') periodLabel = "Year";
             
-            const monthlySavings = income - totalExpenses;
-            
-            const baselineMonthlySavings = baselineAvgIncome - Object.values(baselineAvgExpenses).reduce((a, b) => a + b, 0);
-            
-            let baselineProjection = [];
-            let simulatedProjection = [];
-            let currentBaseline = initialSavings;
-            let currentSimulated = initialSavings;
+            const projectionA = calculateProjection('A');
+            const projectionB = calculateProjection('B');
             
             const labels = [];
-            for(let i = 0; i <= months; i++) {
-                labels.push(`Month ${i}`);
-                if (i === 0) {
-                    baselineProjection.push(initialSavings);
-                    simulatedProjection.push(initialSavings);
-                } else {
-                    currentBaseline += baselineMonthlySavings;
-                    currentSimulated += monthlySavings;
-                    baselineProjection.push(currentBaseline);
-                    simulatedProjection.push(currentSimulated);
-                }
+            for(let i = 0; i <= projectionLength; i++) {
+                labels.push(`${periodLabel} ${i}`);
             }
-            
-            document.getElementById('simMonthlySavings').innerText = currencyFormatter.format(monthlySavings);
-            document.getElementById('simTotalSavings').innerText = currencyFormatter.format(currentSimulated);
 
             const ctx = document.getElementById('simulatorChart').getContext('2d');
             if (simulatorChart) simulatorChart.destroy();
@@ -1034,16 +1137,16 @@
                     labels: labels,
                     datasets: [
                         {
-                            label: 'Simulated Projection',
-                            data: simulatedProjection,
+                            label: 'Scenario A',
+                            data: projectionA,
                             borderColor: '#3b82f6',
                             backgroundColor: '#3b82f620',
                             fill: true,
                             tension: 0.1
                         },
                          {
-                            label: 'Baseline Projection',
-                            data: baselineProjection,
+                            label: 'Scenario B',
+                            data: projectionB,
                             borderColor: '#6b7280',
                             backgroundColor: '#6b728020',
                             fill: false,
