@@ -60,6 +60,18 @@
             cursor: pointer;
             border-radius: 50%;
         }
+        .tab-btn-active {
+            border-color: #2563eb;
+            color: #2563eb;
+        }
+        .tab-btn-inactive {
+            border-color: transparent;
+            color: #6b7280;
+        }
+        .tab-btn-inactive:hover {
+            border-color: #d1d5db;
+            color: #374151;
+        }
     </style>
 </head>
 <body class="bg-gray-50 text-gray-800">
@@ -89,13 +101,13 @@
 
             <div class="mb-6 border-b border-gray-200">
                 <nav class="flex flex-wrap -mb-px" aria-label="Tabs">
-                    <button data-tab="dashboard" class="tab-btn whitespace-nowrap py-4 px-6 border-b-2 font-medium text-lg border-blue-600 text-blue-600">
+                    <button data-tab="dashboard" class="tab-btn whitespace-nowrap py-4 px-6 border-b-2 font-medium text-lg tab-btn-active">
                         Dashboard
                     </button>
-                    <button data-tab="simulator" class="tab-btn whitespace-nowrap py-4 px-6 border-b-2 font-medium text-lg border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300">
+                    <button data-tab="simulator" class="tab-btn whitespace-nowrap py-4 px-6 border-b-2 font-medium text-lg tab-btn-inactive">
                         Budget Simulator
                     </button>
-                    <button data-tab="transactions" class="tab-btn whitespace-nowrap py-4 px-6 border-b-2 font-medium text-lg border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300">
+                    <button data-tab="transactions" class="tab-btn whitespace-nowrap py-4 px-6 border-b-2 font-medium text-lg tab-btn-inactive">
                         Transactions
                     </button>
                 </nav>
@@ -124,8 +136,39 @@
                     </section>
 
                     <section class="bg-white p-6 rounded-xl shadow-md border border-gray-100">
-                        <h2 class="text-2xl font-semibold mb-4 text-gray-900">Monthly Trends</h2>
-                        <p class="text-gray-600 mb-4">This chart shows your total income, expenses, and net savings for each month.</p>
+                        <h2 class="text-2xl font-semibold mb-4 text-gray-900">Financial Trends</h2>
+                        <p class="text-gray-600 mb-4">Analyze your income, expenses, and savings over time.</p>
+                        
+                        <div class="flex flex-wrap gap-4 items-end mb-6 p-4 bg-gray-50 rounded-lg border">
+                            <div>
+                                <label for="filterStartDate" class="block text-sm font-medium text-gray-700">Start Date</label>
+                                <input type="date" id="filterStartDate" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm text-sm">
+                            </div>
+                            <div>
+                                <label for="filterEndDate" class="block text-sm font-medium text-gray-700">End Date</label>
+                                <input type="date" id="filterEndDate" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm text-sm">
+                            </div>
+                            <div>
+                                <label for="filterAggregation" class="block text-sm font-medium text-gray-700">Group By</label>
+                                <select id="filterAggregation" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm text-sm bg-white">
+                                    <option value="weekly">Weekly</option>
+                                    <option value="monthly" selected>Monthly</option>
+                                    <option value="yearly">Yearly</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Chart Mode</label>
+                                <div class="mt-1 flex rounded-md shadow-sm">
+                                    <button id="toggleMonthly" class="px-4 py-2 text-sm font-medium bg-blue-600 text-white border border-blue-600 rounded-l-md hover:bg-blue-700">
+                                        Monthly
+                                    </button>
+                                    <button id="toggleCumulative" class="px-4 py-2 text-sm font-medium bg-white text-gray-700 border border-gray-300 rounded-r-md hover:bg-gray-50">
+                                        Cumulative
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="chart-container">
                             <canvas id="monthlyTrendChart"></canvas>
                         </div>
@@ -134,7 +177,7 @@
                     <section class="grid grid-cols-1 lg:grid-cols-2 gap-8">
                         <div class="bg-white p-6 rounded-xl shadow-md border border-gray-100">
                             <h2 class="text-2xl font-semibold mb-4 text-gray-900">Expense Breakdown</h2>
-                            <p class="text-gray-600 mb-4">This chart shows the proportion of your spending by category.</p>
+                            <p class="text-gray-600 mb-4">This chart shows the proportion of your spending by category (based on full dataset).</p>
                             <div class="donut-chart-container">
                                 <canvas id="expenseBreakdownChart"></canvas>
                             </div>
@@ -280,6 +323,10 @@
         let baselineAvgIncome = 0;
         let baselineAvgExpenses = {};
         const TOP_EXPENSE_CATEGORIES_COUNT = 5;
+        
+        let minDate, maxDate;
+        let trendChartMode = 'monthly';
+        let aggregationUnit = 'monthly';
 
         const currencyFormatter = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' });
         
@@ -384,6 +431,7 @@
             populateDashboardData();
             populateSimulator();
             updateSimulator();
+            setupTrendChartControls();
         }
 
         function setupTabs() {
@@ -395,12 +443,12 @@
                     const tabId = button.getAttribute('data-tab');
 
                     tabButtons.forEach(btn => {
-                        btn.classList.remove('border-blue-600', 'text-blue-600');
-                        btn.classList.add('border-transparent', 'text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300');
+                        btn.classList.remove('tab-btn-active');
+                        btn.classList.add('tab-btn-inactive');
                     });
 
-                    button.classList.add('border-blue-600', 'text-blue-600');
-                    button.classList.remove('border-transparent', 'text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300');
+                    button.classList.add('tab-btn-active');
+                    button.classList.remove('tab-btn-inactive');
 
                     tabContents.forEach(content => {
                         if (content.id === tabId) {
@@ -457,7 +505,17 @@
                     amount: isNaN(amount) ? 0 : amount,
                     note: row.Note
                 };
-            }).sort((a, b) => a.date - b.date);
+            }).filter(tx => tx.date && !isNaN(tx.date.getTime()))
+              .sort((a, b) => a.date - b.date);
+            
+            if(allTransactions.length === 0) {
+                resetUploadScreen("No valid transactions with dates were found in the file.");
+                return;
+            }
+
+            const dates = allTransactions.map(tx => tx.date);
+            minDate = new Date(dates[0]);
+            maxDate = new Date(dates[dates.length - 1]);
 
             let totalIncome = 0;
             let totalExpenses = 0;
@@ -471,10 +529,6 @@
             let uniqueMonthsForFilter = new Set();
 
             allTransactions.forEach(tx => {
-                if (!tx.date || isNaN(tx.date.getTime())) {
-                    console.warn('Invalid date for transaction:', tx);
-                    return; 
-                }
                 const monthYear = `${tx.date.getFullYear()}-${String(tx.date.getMonth() + 1).padStart(2, '0')}`;
                 const monthLabel = `${monthNames[tx.date.getMonth()]} ${tx.date.getFullYear()}`;
                 uniqueMonths.add(monthYear);
@@ -524,25 +578,125 @@
             renderExpenseBreakdownChart();
             renderTopCategories();
         }
+        
+        function getISOWeek(date) {
+            const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getUTCDate()));
+            d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+            const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+            const weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+            return d.getUTCFullYear() + '-W' + String(weekNo).padStart(2, '0');
+        }
+        
+        function setupTrendChartControls() {
+            const startDateInput = document.getElementById('filterStartDate');
+            const endDateInput = document.getElementById('filterEndDate');
+            
+            const toISODate = (date) => date.toISOString().split('T')[0];
+            
+            startDateInput.value = toISODate(minDate);
+            startDateInput.min = toISODate(minDate);
+            startDateInput.max = toISODate(maxDate);
+            
+            endDateInput.value = toISODate(maxDate);
+            endDateInput.min = toISODate(minDate);
+            endDateInput.max = toISODate(maxDate);
+
+            startDateInput.addEventListener('change', renderMonthlyTrendChart);
+            endDateInput.addEventListener('change', renderMonthlyTrendChart);
+            
+            document.getElementById('filterAggregation').addEventListener('change', (e) => {
+                aggregationUnit = e.target.value;
+                renderMonthlyTrendChart();
+            });
+            
+            const toggleMonthlyBtn = document.getElementById('toggleMonthly');
+            const toggleCumulativeBtn = document.getElementById('toggleCumulative');
+            
+            toggleMonthlyBtn.addEventListener('click', () => {
+                trendChartMode = 'monthly';
+                toggleMonthlyBtn.classList.add('bg-blue-600', 'text-white');
+                toggleMonthlyBtn.classList.remove('bg-white', 'text-gray-700');
+                toggleCumulativeBtn.classList.add('bg-white', 'text-gray-700');
+                toggleCumulativeBtn.classList.remove('bg-blue-600', 'text-white');
+                renderMonthlyTrendChart();
+            });
+            
+            toggleCumulativeBtn.addEventListener('click', () => {
+                trendChartMode = 'cumulative';
+                toggleCumulativeBtn.classList.add('bg-blue-600', 'text-white');
+                toggleCumulativeBtn.classList.remove('bg-white', 'text-gray-700');
+                toggleMonthlyBtn.classList.add('bg-white', 'text-gray-700');
+                toggleMonthlyBtn.classList.remove('bg-blue-600', 'text-white');
+                renderMonthlyTrendChart();
+            });
+        }
 
         function renderMonthlyTrendChart() {
-            const sortedMonths = Object.values(monthlyData).sort((a, b) => {
-                const [aMon, aYear] = a.monthLabel.split(' ');
-                const [bMon, bYear] = b.monthLabel.split(' ');
-                const monthIndex = (mon) => ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"].indexOf(mon);
-                return new Date(aYear, monthIndex(aMon)) - new Date(bYear, monthIndex(bMon));
+            const startDate = new Date(document.getElementById('filterStartDate').value);
+            const endDate = new Date(document.getElementById('filterEndDate').value);
+            endDate.setHours(23, 59, 59, 999); 
+
+            const filteredTransactions = allTransactions.filter(tx => tx.date >= startDate && tx.date <= endDate);
+            
+            const processedData = {};
+            const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+            filteredTransactions.forEach(tx => {
+                let key;
+                if (aggregationUnit === 'monthly') {
+                    key = `${tx.date.getFullYear()}-${String(tx.date.getMonth() + 1).padStart(2, '0')}`;
+                } else if (aggregationUnit === 'weekly') {
+                    key = getISOWeek(tx.date);
+                } else if (aggregationUnit === 'yearly') {
+                    key = tx.date.getFullYear().toString();
+                }
+
+                if (!processedData[key]) {
+                    processedData[key] = { income: 0, expense: 0 };
+                }
+                
+                if (tx.type === 'Income') {
+                    processedData[key].income += tx.amount;
+                } else if (tx.type === 'Expense') {
+                    processedData[key].expense += Math.abs(tx.amount);
+                }
             });
+
+            const sortedKeys = Object.keys(processedData).sort();
+            
+            const labels = sortedKeys.map(key => {
+                if (aggregationUnit === 'monthly') {
+                    const [y, m] = key.split('-');
+                    return `${monthNames[parseInt(m)-1]} ${y}`;
+                }
+                return key;
+            });
+            
+            let incomeData = sortedKeys.map(key => processedData[key].income);
+            let expenseData = sortedKeys.map(key => processedData[key].expense);
+            let savingsData = sortedKeys.map(key => processedData[key].income - processedData[key].expense);
+            
+            const toCumulative = (arr) => {
+                let sum = 0;
+                return arr.map(val => sum += val);
+            };
+
+            if (trendChartMode === 'cumulative') {
+                incomeData = toCumulative(incomeData);
+                expenseData = toCumulative(expenseData);
+                savingsData = toCumulative(savingsData);
+            }
 
             const ctx = document.getElementById('monthlyTrendChart').getContext('2d');
             if (monthlyTrendChart) monthlyTrendChart.destroy();
             monthlyTrendChart = new Chart(ctx, {
                 type: 'line',
                 data: {
-                    labels: sortedMonths.map(d => d.monthLabel),
+                    labels: labels,
                     datasets: [
                         {
                             label: 'Income',
-                            data: sortedMonths.map(d => d.income),
+                            data: incomeData,
                             borderColor: '#10b981',
                             backgroundColor: '#10b98120',
                             fill: true,
@@ -550,7 +704,7 @@
                         },
                         {
                             label: 'Expenses',
-                            data: sortedMonths.map(d => d.expense),
+                            data: expenseData,
                             borderColor: '#ef4444',
                             backgroundColor: '#ef444420',
                             fill: true,
@@ -558,7 +712,7 @@
                         },
                         {
                             label: 'Net Savings',
-                            data: sortedMonths.map(d => d.savings),
+                            data: savingsData,
                             borderColor: '#3b82f6',
                             backgroundColor: '#3b82f620',
                             fill: true,
