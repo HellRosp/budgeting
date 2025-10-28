@@ -72,6 +72,22 @@
             border-color: #d1d5db;
             color: #374151;
         }
+        .filter-btn {
+            transition: all 0.15s ease-in-out;
+        }
+        .filter-btn-active {
+            background-color: #2563eb;
+            color: white;
+            border-color: #2563eb;
+        }
+        .filter-btn-inactive {
+            background-color: white;
+            color: #374151;
+            border-color: #d1d5db;
+        }
+        .filter-btn-inactive:hover {
+            background-color: #f9fafb;
+        }
     </style>
 </head>
 <body class="bg-gray-50 text-gray-800">
@@ -117,27 +133,44 @@
                 <div id="dashboard" class="tab-content space-y-8">
                     <section>
                         <p class="text-base text-gray-700 mb-6">
-                            This dashboard summarizes your financial activity based on the data you provided. Here you can see your total income, expenses, and savings trends, and get a clear breakdown of where your money is going.
+                            This dashboard summarizes your financial activity. Use the category filters to dynamically update the charts and KPIs below.
                         </p>
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                             <div class="bg-white p-6 rounded-xl shadow-md border border-gray-100">
-                                <h3 class="text-lg font-medium text-gray-500">Total Income (YTD)</h3>
+                                <h3 class="text-lg font-medium text-gray-500">Total Income</h3>
                                 <p id="totalIncome" class="text-3xl font-bold text-green-600 mt-2">€0.00</p>
                             </div>
                             <div class="bg-white p-6 rounded-xl shadow-md border border-gray-100">
-                                <h3 class="text-lg font-medium text-gray-500">Total Expenses (YTD)</h3>
+                                <h3 class="text-lg font-medium text-gray-500">Total Expenses</h3>
                                 <p id="totalExpenses" class="text-3xl font-bold text-red-600 mt-2">€0.00</p>
                             </div>
                             <div class="bg-white p-6 rounded-xl shadow-md border border-gray-100">
-                                <h3 class="text-lg font-medium text-gray-500">Net Savings (YTD)</h3>
+                                <h3 class="text-lg font-medium text-gray-500">Net Savings</h3>
                                 <p id="netSavings" class="text-3xl font-bold text-blue-600 mt-2">€0.00</p>
+                            </div>
+                        </div>
+                    </section>
+                    
+                    <section class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <div class="bg-white p-6 rounded-xl shadow-md border border-gray-100">
+                            <h2 class="text-2xl font-semibold mb-4 text-gray-900">Expense Breakdown</h2>
+                            <p class="text-gray-600 mb-4">Proportion of spending for all categories or just those selected.</p>
+                            <div class="donut-chart-container">
+                                <canvas id="expenseBreakdownChart"></canvas>
+                            </div>
+                        </div>
+                        <div class="bg-white p-6 rounded-xl shadow-md border border-gray-100">
+                            <h2 class="text-2xl font-semibold mb-4 text-gray-900">Filter Expenses</h2>
+                            <p class="text-gray-600 mb-4">Click categories to toggle filters. This updates all dashboard components.</p>
+                            <div id="categoryFilterContainer" class="flex flex-wrap gap-2 max-h-80 overflow-y-auto">
+                                <!-- Filter buttons will be dynamically inserted here -->
                             </div>
                         </div>
                     </section>
 
                     <section class="bg-white p-6 rounded-xl shadow-md border border-gray-100">
                         <h2 class="text-2xl font-semibold mb-4 text-gray-900">Financial Trends</h2>
-                        <p class="text-gray-600 mb-4">Analyze your income, expenses, and savings over time.</p>
+                        <p class="text-gray-600 mb-4">Analyze your income, expenses, and savings over time based on your filters.</p>
                         
                         <div class="flex flex-wrap gap-4 items-end mb-6 p-4 bg-gray-50 rounded-lg border">
                             <div>
@@ -174,21 +207,6 @@
                         </div>
                     </section>
 
-                    <section class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                        <div class="bg-white p-6 rounded-xl shadow-md border border-gray-100">
-                            <h2 class="text-2xl font-semibold mb-4 text-gray-900">Expense Breakdown</h2>
-                            <p class="text-gray-600 mb-4">This chart shows the proportion of your spending by category (based on full dataset).</p>
-                            <div class="donut-chart-container">
-                                <canvas id="expenseBreakdownChart"></canvas>
-                            </div>
-                        </div>
-                        <div class="bg-white p-6 rounded-xl shadow-md border border-gray-100">
-                            <h2 class="text-2xl font-semibold mb-4 text-gray-900">Top 5 Expense Categories</h2>
-                            <p class="text-gray-600 mb-4">These are your highest spending categories for the year so far.</p>
-                            <ul id="topCategoriesList" class="space-y-3">
-                            </ul>
-                        </div>
-                    </section>
                 </div>
 
                 <div id="simulator" class="tab-content hidden space-y-8">
@@ -363,6 +381,9 @@
 
     <script>
         let allTransactions = [];
+        let currentDashboardTransactions = [];
+        let activeCategoryFilters = new Set();
+        
         let monthlyData = {};
         let expenseCategoryData = {};
         let incomeCategoryData = {};
@@ -480,11 +501,14 @@
             setupTabs();
             setupFilters();
             setupSimulatorInputs();
-            populateDashboardData();
+            updateKPIs(allTransactions);
             populateSimulator('A');
             populateSimulator('B');
             updateSimulator();
             setupTrendChartControls();
+            renderMonthlyTrendChart();
+            renderExpenseBreakdownChart(expenseCategoryData);
+            setupCategoryFilters(expenseCategoryData);
         }
 
         function setupTabs() {
@@ -565,6 +589,8 @@
                 resetUploadScreen("No valid transactions with dates were found in the file.");
                 return;
             }
+            
+            currentDashboardTransactions = [...allTransactions];
 
             const dates = allTransactions.map(tx => tx.date);
             minDate = new Date(dates[0]);
@@ -618,18 +644,80 @@
                 baselineAvgExpenses[cat] = expenseCategoryData[cat] / numMonths;
             });
             
-            document.getElementById('totalIncome').innerText = currencyFormatter.format(totalIncome);
-            document.getElementById('totalExpenses').innerText = currencyFormatter.format(totalExpenses);
-            document.getElementById('netSavings').innerText = currencyFormatter.format(totalIncome - totalExpenses);
-            
             populateFilters(Array.from(uniqueCategories), Array.from(uniqueMonthsForFilter));
             renderTransactionsTable();
         }
-
-        function populateDashboardData() {
+        
+        function updateKPIs(transactions) {
+            let totalIncome = 0;
+            let totalExpenses = 0;
+            
+            transactions.forEach(tx => {
+                if (tx.type === 'Income') {
+                    totalIncome += tx.amount;
+                } else if (tx.type === 'Expense') {
+                    totalExpenses += Math.abs(tx.amount);
+                }
+            });
+            
+            document.getElementById('totalIncome').innerText = currencyFormatter.format(totalIncome);
+            document.getElementById('totalExpenses').innerText = currencyFormatter.format(totalExpenses);
+            document.getElementById('netSavings').innerText = currencyFormatter.format(totalIncome - totalExpenses);
+        }
+        
+        function setupCategoryFilters(categories) {
+            const container = document.getElementById('categoryFilterContainer');
+            container.innerHTML = '';
+            
+            Object.keys(categories).sort().forEach(category => {
+                const button = document.createElement('button');
+                button.className = 'filter-btn filter-btn-inactive py-2 px-4 border rounded-full text-sm font-medium cursor-pointer';
+                button.dataset.category = category;
+                button.textContent = category;
+                button.addEventListener('click', () => toggleCategoryFilter(category, button));
+                container.appendChild(button);
+            });
+        }
+        
+        function toggleCategoryFilter(category, button) {
+            if (activeCategoryFilters.has(category)) {
+                activeCategoryFilters.delete(category);
+                button.classList.add('filter-btn-inactive');
+                button.classList.remove('filter-btn-active');
+            } else {
+                activeCategoryFilters.add(category);
+                button.classList.add('filter-btn-active');
+                button.classList.remove('filter-btn-inactive');
+            }
+            refreshDashboard();
+        }
+        
+        function refreshDashboard() {
+            const incomeTxs = allTransactions.filter(tx => tx.type === 'Income');
+            const expenseTxs = allTransactions.filter(tx => tx.type === 'Expense');
+            
+            let filteredExpenseTxs;
+            let dataForBreakdown;
+            
+            if (activeCategoryFilters.size === 0) {
+                filteredExpenseTxs = expenseTxs;
+                dataForBreakdown = expenseCategoryData;
+            } else {
+                filteredExpenseTxs = expenseTxs.filter(tx => activeCategoryFilters.has(tx.category));
+                
+                dataForBreakdown = {};
+                filteredExpenseTxs.forEach(tx => {
+                    const expenseAmount = Math.abs(tx.amount);
+                    if (!dataForBreakdown[tx.category]) dataForBreakdown[tx.category] = 0;
+                    dataForBreakdown[tx.category] += expenseAmount;
+                });
+            }
+            
+            currentDashboardTransactions = [...incomeTxs, ...filteredExpenseTxs];
+            
+            updateKPIs(currentDashboardTransactions);
             renderMonthlyTrendChart();
-            renderExpenseBreakdownChart();
-            renderTopCategories();
+            renderExpenseBreakdownChart(dataForBreakdown);
         }
         
         function getISOWeek(date) {
@@ -689,7 +777,7 @@
             const endDate = new Date(document.getElementById('filterEndDate').value);
             endDate.setHours(23, 59, 59, 999); 
 
-            const filteredTransactions = allTransactions.filter(tx => tx.date >= startDate && tx.date <= endDate);
+            const filteredTransactions = currentDashboardTransactions.filter(tx => tx.date >= startDate && tx.date <= endDate);
             
             const processedData = {};
             const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -795,8 +883,8 @@
             });
         }
 
-        function renderExpenseBreakdownChart() {
-            const sortedCategories = Object.entries(expenseCategoryData).sort(([,a], [,b]) => b - a);
+        function renderExpenseBreakdownChart(dataToRender) {
+            const sortedCategories = Object.entries(dataToRender).sort(([,a], [,b]) => b - a);
             const labels = sortedCategories.map(item => item[0]);
             const data = sortedCategories.map(item => item[1]);
 
@@ -840,33 +928,6 @@
             });
         }
         
-        function renderTopCategories() {
-            const topCategories = Object.entries(expenseCategoryData)
-                .sort(([,a], [,b]) => b - a)
-                .slice(0, 5);
-            
-            const listEl = document.getElementById('topCategoriesList');
-            listEl.innerHTML = '';
-            
-            if(topCategories.length === 0) {
-                listEl.innerHTML = '<li class="text-gray-500">No expense data available.</li>';
-                return;
-            }
-
-            topCategories.forEach(([category, amount], index) => {
-                const li = document.createElement('li');
-                li.className = 'flex justify-between items-center py-3 border-b border-gray-100';
-                li.innerHTML = `
-                    <span class="flex items-center">
-                        <span class="inline-block w-6 h-6 rounded-full mr-3" style="background-color: ${chartColors[index % chartColors.length]}"></span>
-                        <span class="text-md font-medium text-gray-800">${category}</span>
-                    </span>
-                    <span class="text-md font-semibold text-gray-900">${currencyFormatter.format(amount)}</span>
-                `;
-                listEl.appendChild(li);
-            });
-        }
-
         function populateFilters(categories, months) {
             const categoryFilter = document.getElementById('filterCategory');
             categoryFilter.innerHTML = '<option value="">All Categories</option>';
@@ -1078,7 +1139,6 @@
         }
         
         function calculateProjection(suffix) {
-            const periodMultiplier = getPeriodMultiplier();
             const projectionLength = parseInt(document.getElementById('simLength').value) || 24;
 
             const initialSavings = parseFloat(document.getElementById(`simInitialSavings${suffix}`).value) || 0;
