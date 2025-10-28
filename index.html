@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Personal Finance Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.0/papaparse.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- Chosen Palette: Calm Neutrals (Grays, Blues, with Green/Red accents) -->
+    <!-- Application Structure Plan: A 3-tab SPA (Dashboard, Budget Simulator, Transactions). Dashboard provides a summary of past data (KPIs, trends, breakdown). Budget Simulator allows interactive projection of future savings based on adjustable income/expense variables, directly addressing the user's core request. Transactions tab provides a filterable drill-down of all raw data. This structure separates analysis from simulation for a clear, task-oriented user flow. -->
+    <!-- Visualization & Content Choices: 1. KPIs (Total Income/Expense/Savings): Inform -> HTML Cards -> No interaction -> Simple, high-level summary. 2. Monthly Trend: Show Change -> Chart.js Line Chart -> Hover tooltips -> Shows performance over time. 3. Expense Breakdown: Show Proportions -> Chart.js Doughnut Chart -> Hover/Click -> Answers 'where is money going?'. 4. Simulator Inputs: Interact -> HTML Sliders/Inputs -> User input -> Powers the simulation model. 5. Simulator Projection: Show Impact -> Chart.js Line Chart -> Updates on input -> Directly visualizes the 'what-if' scenarios requested. 6. Transaction List: Organize/Drill-down -> Filterable HTML Table -> User filter -> Provides access to raw data details. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 900px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 40vh;
+            max-height: 450px;
+        }
+        .donut-chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 450px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 40vh;
+            max-height: 450px;
+        }
+        .simulator-chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 900px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 45vh;
+            max-height: 500px;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #2563eb;
+            cursor: pointer;
+            border-radius: 50%;
+        }
+        input[type="range"]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            background: #2563eb;
+            cursor: pointer;
+            border-radius: 50%;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800">
+
+    <div class="container mx-auto p-4 md:p-8 max-w-7xl">
+
+        <!-- File Upload Screen -->
+        <div id="uploadScreen" class="text-center p-12 bg-white rounded-xl shadow-lg border border-gray-100 max-w-2xl mx-auto mt-20">
+            <h1 class="text-3xl font-bold text-gray-900 mb-4">Welcome to your Financial Dashboard</h1>
+            <p class="text-lg text-gray-600 mb-8">Please upload your transaction file (`.csv` or `.xlsx`) to get started.</p>
+            <input type="file" id="csvFileInput" class="block w-full text-sm text-gray-500
+                file:mr-4 file:py-3 file:px-6
+                file:rounded-lg file:border-0
+                file:text-sm file:font-semibold
+                file:bg-blue-50 file:text-blue-700
+                hover:file:bg-blue-100 cursor-pointer"
+                accept=".csv, .xlsx, .xls">
+            <p id="uploadError" class="text-red-500 text-sm mt-4 hidden"></p>
+        </div>
+
+        <!-- Main Application (Initially Hidden) -->
+        <div id="appContainer" class="hidden">
+            <header class="mb-8">
+                <h1 class="text-3xl md:text-4xl font-bold text-gray-900">My Financial Dashboard</h1>
+                <p class="text-lg text-gray-600">Analyze your spending and project your savings.</p>
+            </header>
+
+            <div class="mb-6 border-b border-gray-200">
+                <nav class="flex flex-wrap -mb-px" aria-label="Tabs">
+                    <button data-tab="dashboard" class="tab-btn whitespace-nowrap py-4 px-6 border-b-2 font-medium text-lg border-blue-600 text-blue-600">
+                        Dashboard
+                    </button>
+                    <button data-tab="simulator" class="tab-btn whitespace-nowrap py-4 px-6 border-b-2 font-medium text-lg border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300">
+                        Budget Simulator
+                    </button>
+                    <button data-tab="transactions" class="tab-btn whitespace-nowrap py-4 px-6 border-b-2 font-medium text-lg border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300">
+                        Transactions
+                    </button>
+                </nav>
+            </div>
+
+            <main>
+                <div id="dashboard" class="tab-content space-y-8">
+                    <section>
+                        <p class="text-base text-gray-700 mb-6">
+                            This dashboard summarizes your financial activity based on the data you provided. Here you can see your total income, expenses, and savings trends, and get a clear breakdown of where your money is going.
+                        </p>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div class="bg-white p-6 rounded-xl shadow-md border border-gray-100">
+                                <h3 class="text-lg font-medium text-gray-500">Total Income (YTD)</h3>
+                                <p id="totalIncome" class="text-3xl font-bold text-green-600 mt-2">€0.00</p>
+                            </div>
+                            <div class="bg-white p-6 rounded-xl shadow-md border border-gray-100">
+                                <h3 class="text-lg font-medium text-gray-500">Total Expenses (YTD)</h3>
+                                <p id="totalExpenses" class="text-3xl font-bold text-red-600 mt-2">€0.00</p>
+                            </div>
+                            <div class="bg-white p-6 rounded-xl shadow-md border border-gray-100">
+                                <h3 class="text-lg font-medium text-gray-500">Net Savings (YTD)</h3>
+                                <p id="netSavings" class="text-3xl font-bold text-blue-600 mt-2">€0.00</p>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="bg-white p-6 rounded-xl shadow-md border border-gray-100">
+                        <h2 class="text-2xl font-semibold mb-4 text-gray-900">Monthly Trends</h2>
+                        <p class="text-gray-600 mb-4">This chart shows your total income, expenses, and net savings for each month.</p>
+                        <div class="chart-container">
+                            <canvas id="monthlyTrendChart"></canvas>
+                        </div>
+                    </section>
+
+                    <section class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <div class="bg-white p-6 rounded-xl shadow-md border border-gray-100">
+                            <h2 class="text-2xl font-semibold mb-4 text-gray-900">Expense Breakdown</h2>
+                            <p class="text-gray-600 mb-4">This chart shows the proportion of your spending by category.</p>
+                            <div class="donut-chart-container">
+                                <canvas id="expenseBreakdownChart"></canvas>
+                            </div>
+                        </div>
+                        <div class="bg-white p-6 rounded-xl shadow-md border border-gray-100">
+                            <h2 class="text-2xl font-semibold mb-4 text-gray-900">Top 5 Expense Categories</h2>
+                            <p class="text-gray-600 mb-4">These are your highest spending categories for the year so far.</p>
+                            <ul id="topCategoriesList" class="space-y-3">
+                            </ul>
+                        </div>
+                    </section>
+                </div>
+
+                <div id="simulator" class="tab-content hidden space-y-8">
+                    <section class="bg-white p-6 rounded-xl shadow-md border border-gray-100">
+                        <h2 class="text-2xl font-semibold mb-4 text-gray-900">Budget Simulator</h2>
+                        <p class="text-base text-gray-700 mb-6">
+                            Use this tool to project your future savings. We've started with your current monthly averages calculated from your transaction data. Adjust the values for your income or spending categories to see how those changes might affect your financial future over the next 24 months.
+                        </p>
+                        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                            <div class="lg:col-span-1 space-y-6">
+                                <h3 class="text-xl font-semibold text-gray-800">Adjust Your Monthly Budget</h3>
+                                <div>
+                                    <label for="simInitialSavings" class="block text-sm font-medium text-gray-700">Starting Savings (€)</label>
+                                    <input type="number" id="simInitialSavings" value="0" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                                </div>
+                                <div>
+                                    <label for="simIncome" class="block text-sm font-medium text-gray-700">Monthly Income (€)</label>
+                                    <div class="flex items-center space-x-2">
+                                        <input type="range" id="simIncomeRange" min="0" max="10000" step="100" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                                        <input type="number" id="simIncome" class="w-28 p-2 border border-gray-300 rounded-md shadow-sm">
+                                    </div>
+                                </div>
+
+                                <h4 class="text-lg font-semibold text-gray-800 pt-4">Monthly Expenses</h4>
+                                <div id="simExpenseInputs" class="space-y-4">
+                                </div>
+
+                                <div>
+                                    <label for="simMonths" class="block text-sm font-medium text-gray-700">Projection Length (Months)</label>
+                                    <div class="flex items-center space-x-2">
+                                        <input type="range" id="simMonthsRange" min="6" max="36" step="1" value="24" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                                        <input type="number" id="simMonths" value="24" class="w-28 p-2 border border-gray-300 rounded-md shadow-sm">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="lg:col-span-2">
+                                <h3 class="text-xl font-semibold text-gray-800 mb-4">Projected Savings</h3>
+                                <div class="bg-blue-50 border border-blue-200 text-blue-800 p-4 rounded-lg mb-4">
+                                    <p class="font-medium">Baseline vs. Simulated</p>
+                                    <p class="text-sm">The "Baseline" projection (dashed line) uses your original monthly averages. The "Simulated" projection (solid line) updates live as you change the values on the left.</p>
+                                </div>
+                                <div class="simulator-chart-container">
+                                    <canvas id="simulatorChart"></canvas>
+                                </div>
+                                <div class="mt-6 grid grid-cols-2 gap-4">
+                                    <div class="bg-gray-100 p-4 rounded-lg">
+                                        <h4 class="text-sm font-medium text-gray-500">Simulated Monthly Savings</h4>
+                                        <p id="simMonthlySavings" class="text-2xl font-bold text-blue-700">€0.00</p>
+                                    </div>
+                                    <div class="bg-gray-100 p-4 rounded-lg">
+                                        <h4 class="text-sm font-medium text-gray-500">Simulated Total After <span id="simMonthsDisplay">24</span> Months</h4>
+                                        <p id="simTotalSavings" class="text-2xl font-bold text-blue-700">€0.00</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+
+                <div id="transactions" class="tab-content hidden">
+                    <section class="bg-white p-6 rounded-xl shadow-md border border-gray-100">
+                        <h2 class="text-2xl font-semibold mb-4 text-gray-900">Transaction Explorer</h2>
+                        <p class="text-base text-gray-700 mb-6">
+                            Explore all your past transactions. Use the filters below to search by keyword, narrow down by category, or select a specific transaction type or month. The table will update automatically.
+                        </p>
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                            <div>
+                                <label for="filterKeyword" class="block text-sm font-medium text-gray-700">Search Note</label>
+                                <input type="text" id="filterKeyword" placeholder="e.g., Rent, Gym" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                            </div>
+                            <div>
+                                <label for="filterCategory" class="block text-sm font-medium text-gray-700">Category</label>
+                                <select id="filterCategory" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="">All Categories</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="filterType" class="block text-sm font-medium text-gray-700">Type</label>
+                                <select id="filterType" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="">All Types</option>
+                                    <option value="Income">Income</option>
+                                    <option value="Expense">Expense</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="filterMonth" class="block text-sm font-medium text-gray-700">Month</label>
+                                <select id="filterMonth" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="">All Months</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-100">
+                                    <tr>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Note</th>
+                                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Amount (€)</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="transactionsTableBody" class="bg-white divide-y divide-gray-200">
+                                    <tr>
+                                        <td colspan="4" class="px-6 py-12 text-center text-gray-500">No transactions found.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script>
+        let allTransactions = [];
+        let monthlyData = {};
+        let expenseCategoryData = {};
+        let incomeCategoryData = {};
+        
+        let monthlyTrendChart = null;
+        let expenseBreakdownChart = null;
+        let simulatorChart = null;
+
+        let baselineAvgIncome = 0;
+        let baselineAvgExpenses = {};
+        const TOP_EXPENSE_CATEGORIES_COUNT = 5;
+
+        const currencyFormatter = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' });
+        
+        const chartColors = [
+            '#3b82f6', '#10b981', '#ef4444', '#f59e0b', '#8b5cf6', '#ec4899', 
+            '#14b8a6', '#6366f1', '#d946ef', '#f97316'
+        ];
+
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('csvFileInput').addEventListener('change', handleFileSelect);
+        });
+        
+        function resetUploadScreen(errorMessage = "") {
+            const uploadScreen = document.getElementById('uploadScreen');
+            uploadScreen.innerHTML = `
+                <h1 class="text-3xl font-bold text-gray-900 mb-4">Welcome to your Financial Dashboard</h1>
+                <p class="text-lg text-gray-600 mb-8">Please upload your transaction file ('\`.csv\`' or '\`.xlsx\`') to get started.</p>
+                <input type="file" id="csvFileInput" class="block w-full text-sm text-gray-500
+                    file:mr-4 file:py-3 file:px-6
+                    file:rounded-lg file:border-0
+                    file:text-sm file:font-semibold
+                    file:bg-blue-50 file:text-blue-700
+                    hover:file:bg-blue-100 cursor-pointer"
+                    accept=".csv, .xlsx, .xls">
+                <p id="uploadError" class="text-red-500 text-sm mt-4 ${errorMessage ? '' : 'hidden'}">${errorMessage}</p>
+            `;
+            document.getElementById('csvFileInput').addEventListener('change', handleFileSelect);
+        }
+
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            const uploadError = document.getElementById('uploadError');
+            uploadError.classList.add('hidden');
+            
+            if (!file) return;
+
+            document.getElementById('uploadScreen').innerHTML = `
+                <p class="text-lg text-gray-700 p-8">Loading and processing your file...</p>
+            `;
+
+            const reader = new FileReader();
+
+            reader.onload = (e) => {
+                try {
+                    let data;
+                    if (file.name.endsWith('.csv')) {
+                        const csvData = e.target.result;
+                        const parsed = Papa.parse(csvData, { header: true, skipEmptyLines: true });
+                        if (parsed.errors.length > 0) {
+                            console.warn("Parsing errors:", parsed.errors);
+                        }
+                        data = parsed.data;
+                    } else if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+                        const workbook = XLSX.read(e.target.result, { type: 'array' });
+                        const firstSheetName = workbook.SheetNames[0];
+                        const worksheet = workbook.Sheets[firstSheetName];
+                        data = XLSX.utils.sheet_to_json(worksheet, {
+                            raw: false,
+                            dateNF: 'yyyy-mm-dd'
+                        });
+                    } else {
+                        throw new Error("Unsupported file type. Please upload a .csv, .xls, or .xlsx file.");
+                    }
+                    
+                    if (!data || data.length === 0) {
+                         throw new Error("No data found in the file or file is empty.");
+                    }
+                    
+                    if (!data[0] || !data[0].hasOwnProperty('Date') || !data[0].hasOwnProperty('Amount')) {
+                         throw new Error("File format is incorrect. Make sure columns 'Date' and 'Amount' exist.");
+                    }
+
+                    processData(data);
+                    document.getElementById('uploadScreen').classList.add('hidden');
+                    document.getElementById('appContainer').classList.remove('hidden');
+                    setupApp();
+
+                } catch (error) {
+                    console.error("Error processing file:", error);
+                    resetUploadScreen(error.message);
+                }
+            };
+
+            reader.onerror = (err) => {
+                 console.error("FileReader error:", err);
+                 resetUploadScreen('Error reading the file. Please try again.');
+            };
+
+            if (file.name.endsWith('.csv')) {
+                reader.readAsText(file);
+            } else if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+                reader.readAsArrayBuffer(file);
+            } else {
+                resetUploadScreen("Unsupported file type. Please upload a .csv, .xls, or .xlsx file.");
+            }
+        }
+        
+        function setupApp() {
+            setupTabs();
+            setupFilters();
+            setupSimulatorInputs();
+            populateDashboardData();
+        }
+
+        function setupTabs() {
+            const tabButtons = document.querySelectorAll('.tab-btn');
+            const tabContents = document.querySelectorAll('.tab-content');
+
+            tabButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    const tabId = button.getAttribute('data-tab');
+
+                    tabButtons.forEach(btn => {
+                        btn.classList.remove('border-blue-600', 'text-blue-600');
+                        btn.classList.add('border-transparent', 'text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300');
+                    });
+
+                    button.classList.add('border-blue-600', 'text-blue-600');
+                    button.classList.remove('border-transparent', 'text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300');
+
+                    tabContents.forEach(content => {
+                        if (content.id === tabId) {
+                            content.classList.remove('hidden');
+                        } else {
+                            content.classList.add('hidden');
+                        }
+                    });
+                });
+            });
+        }
+
+        function excelDateToJSDate(serial) {
+           if (typeof serial === 'string') {
+                const isoMatch = serial.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/);
+                if (isoMatch) {
+                    return new Date(serial);
+                }
+                
+                const simpleDateMatch = serial.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+                if(simpleDateMatch) {
+                    return new Date(serial);
+                }
+           }
+           
+           if (typeof serial === 'number') {
+                const utc_days  = Math.floor(serial - 25569);
+                const utc_value = utc_days * 86400;                                        
+                const date_info = new Date(utc_value * 1000);
+                const fractional_day = serial - Math.floor(serial) + 0.0000001;
+                let total_seconds = Math.floor(86400 * fractional_day);
+                const seconds = total_seconds % 60;
+                total_seconds -= seconds;
+                const hours = Math.floor(total_seconds / (60 * 60));
+                const minutes = Math.floor(total_seconds / 60) % 60;
+                return new Date(date_info.getFullYear(), date_info.getMonth(), date_info.getDate(), hours, minutes, seconds);
+           }
+           return new Date(serial);
+        }
+
+        function processData(data) {
+            allTransactions = data.map(row => {
+                let amount = parseFloat(row.Amount);
+                if (String(row.Amount).includes(',')) {
+                    amount = parseFloat(String(row.Amount).replace('.', '').replace(',', '.'));
+                }
+                
+                let txDate = excelDateToJSDate(row.Date);
+
+                return {
+                    date: txDate,
+                    type: row.Type,
+                    category: row['Category name'] || 'Uncategorized',
+                    amount: isNaN(amount) ? 0 : amount,
+                    note: row.Note
+                };
+            }).sort((a, b) => a.date - b.date);
+
+            let totalIncome = 0;
+            let totalExpenses = 0;
+            monthlyData = {};
+            expenseCategoryData = {};
+            incomeCategoryData = {};
+
+            const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+            let uniqueMonths = new Set();
+            let uniqueCategories = new Set();
+            let uniqueMonthsForFilter = new Set();
+
+            allTransactions.forEach(tx => {
+                if (!tx.date || isNaN(tx.date.getTime())) {
+                    console.warn('Invalid date for transaction:', tx);
+                    return; 
+                }
+                const monthYear = `${tx.date.getFullYear()}-${String(tx.date.getMonth() + 1).padStart(2, '0')}`;
+                const monthLabel = `${monthNames[tx.date.getMonth()]} ${tx.date.getFullYear()}`;
+                uniqueMonths.add(monthYear);
+                uniqueMonthsForFilter.add(monthLabel);
+
+                if (!monthlyData[monthYear]) {
+                    monthlyData[monthYear] = { monthLabel: monthLabel, income: 0, expense: 0, savings: 0 };
+                }
+
+                if (tx.type === 'Income') {
+                    totalIncome += tx.amount;
+                    monthlyData[monthYear].income += tx.amount;
+                    if (!incomeCategoryData[tx.category]) incomeCategoryData[tx.category] = 0;
+                    incomeCategoryData[tx.category] += tx.amount;
+                } else if (tx.type === 'Expense') {
+                    const expenseAmount = Math.abs(tx.amount);
+                    totalExpenses += expenseAmount;
+                    monthlyData[monthYear].expense += expenseAmount;
+                    if (!expenseCategoryData[tx.category]) expenseCategoryData[tx.category] = 0;
+                    expenseCategoryData[tx.category] += expenseAmount;
+                    uniqueCategories.add(tx.category);
+                }
+            });
+            
+            Object.keys(monthlyData).forEach(key => {
+                monthlyData[key].savings = monthlyData[key].income - monthlyData[key].expense;
+            });
+
+            const numMonths = uniqueMonths.size > 0 ? uniqueMonths.size : 1;
+            baselineAvgIncome = totalIncome / numMonths;
+            
+            baselineAvgExpenses = {};
+            Object.keys(expenseCategoryData).forEach(cat => {
+                baselineAvgExpenses[cat] = expenseCategoryData[cat] / numMonths;
+            });
+            
+            document.getElementById('totalIncome').innerText = currencyFormatter.format(totalIncome);
+            document.getElementById('totalExpenses').innerText = currencyFormatter.format(totalExpenses);
+            document.getElementById('netSavings').innerText = currencyFormatter.format(totalIncome - totalExpenses);
+            
+            populateFilters(Array.from(uniqueCategories), Array.from(uniqueMonthsForFilter));
+            populateSimulator();
+            renderTransactionsTable();
+        }
+
+        function populateDashboardData() {
+            renderMonthlyTrendChart();
+            renderExpenseBreakdownChart();
+            renderTopCategories();
+        }
+
+        function renderMonthlyTrendChart() {
+            const sortedMonths = Object.values(monthlyData).sort((a, b) => {
+                const [aMon, aYear] = a.monthLabel.split(' ');
+                const [bMon, bYear] = b.monthLabel.split(' ');
+                const monthIndex = (mon) => ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"].indexOf(mon);
+                return new Date(aYear, monthIndex(aMon)) - new Date(bYear, monthIndex(bMon));
+            });
+
+            const ctx = document.getElementById('monthlyTrendChart').getContext('2d');
+            if (monthlyTrendChart) monthlyTrendChart.destroy();
+            monthlyTrendChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: sortedMonths.map(d => d.monthLabel),
+                    datasets: [
+                        {
+                            label: 'Income',
+                            data: sortedMonths.map(d => d.income),
+                            borderColor: '#10b981',
+                            backgroundColor: '#10b98120',
+                            fill: true,
+                            tension: 0.3
+                        },
+                        {
+                            label: 'Expenses',
+                            data: sortedMonths.map(d => d.expense),
+                            borderColor: '#ef4444',
+                            backgroundColor: '#ef444420',
+                            fill: true,
+                            tension: 0.3
+                        },
+                        {
+                            label: 'Net Savings',
+                            data: sortedMonths.map(d => d.savings),
+                            borderColor: '#3b82f6',
+                            backgroundColor: '#3b82f620',
+                            fill: true,
+                            tension: 0.3
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            ticks: {
+                                callback: value => currencyFormatter.format(value)
+                            }
+                        }
+                    },
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: context => `${context.dataset.label}: ${currencyFormatter.format(context.raw)}`
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderExpenseBreakdownChart() {
+            const sortedCategories = Object.entries(expenseCategoryData).sort(([,a], [,b]) => b - a);
+            const labels = sortedCategories.map(item => item[0]);
+            const data = sortedCategories.map(item => item[1]);
+
+            const ctx = document.getElementById('expenseBreakdownChart').getContext('2d');
+            if (expenseBreakdownChart) expenseBreakdownChart.destroy();
+            expenseBreakdownChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: chartColors,
+                        borderColor: '#ffffff',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                padding: 15,
+                                boxWidth: 12
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: context => {
+                                    const label = context.label || '';
+                                    const value = context.raw || 0;
+                                    const total = context.chart.getDataTotal();
+                                    const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+                                    return `${label}: ${currencyFormatter.format(value)} (${percentage}%)`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        function renderTopCategories() {
+            const topCategories = Object.entries(expenseCategoryData)
+                .sort(([,a], [,b]) => b - a)
+                .slice(0, 5);
+            
+            const listEl = document.getElementById('topCategoriesList');
+            listEl.innerHTML = '';
+            
+            if(topCategories.length === 0) {
+                listEl.innerHTML = '<li class="text-gray-500">No expense data available.</li>';
+                return;
+            }
+
+            topCategories.forEach(([category, amount], index) => {
+                const li = document.createElement('li');
+                li.className = 'flex justify-between items-center py-3 border-b border-gray-100';
+                li.innerHTML = `
+                    <span class="flex items-center">
+                        <span class="inline-block w-6 h-6 rounded-full mr-3" style="background-color: ${chartColors[index % chartColors.length]}"></span>
+                        <span class="text-md font-medium text-gray-800">${category}</span>
+                    </span>
+                    <span class="text-md font-semibold text-gray-900">${currencyFormatter.format(amount)}</span>
+                `;
+                listEl.appendChild(li);
+            });
+        }
+
+        function populateFilters(categories, months) {
+            const categoryFilter = document.getElementById('filterCategory');
+            categoryFilter.innerHTML = '<option value="">All Categories</option>';
+            categories.sort().forEach(cat => {
+                const option = document.createElement('option');
+                option.value = cat;
+                option.textContent = cat;
+                categoryFilter.appendChild(option);
+            });
+            
+            const monthFilter = document.getElementById('filterMonth');
+            monthFilter.innerHTML = '<option value="">All Months</option>';
+            const monthIndex = (mon) => ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"].indexOf(mon);
+            
+            months.sort((a,b) => {
+                const [aMon, aYear] = a.split(' ');
+                const [bMon, bYear] = b.split(' ');
+                return new Date(aYear, monthIndex(aMon)) - new Date(bYear, monthIndex(bMon));
+            }).forEach(month => {
+                const option = document.createElement('option');
+                option.value = month;
+                option.textContent = month;
+                monthFilter.appendChild(option);
+            });
+        }
+        
+        function setupFilters() {
+            document.getElementById('filterKeyword').addEventListener('input', renderTransactionsTable);
+            document.getElementById('filterCategory').addEventListener('change', renderTransactionsTable);
+            document.getElementById('filterType').addEventListener('change', renderTransactionsTable);
+            document.getElementById('filterMonth').addEventListener('change', renderTransactionsTable);
+        }
+
+        function renderTransactionsTable() {
+            const keyword = document.getElementById('filterKeyword').value.toLowerCase();
+            const category = document.getElementById('filterCategory').value;
+            const type = document.getElementById('filterType').value;
+            const month = document.getElementById('filterMonth').value;
+            
+            const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+            const filteredData = allTransactions.filter(tx => {
+                if (!tx.date || isNaN(tx.date.getTime())) return false; 
+                
+                const txMonthLabel = `${monthNames[tx.date.getMonth()]} ${tx.date.getFullYear()}`;
+                
+                const matchesKeyword = !keyword || (tx.note && tx.note.toLowerCase().includes(keyword));
+                const matchesCategory = !category || tx.category === category;
+                const matchesType = !type || tx.type === type;
+                const matchesMonth = !month || txMonthLabel === month;
+                
+                return matchesKeyword && matchesCategory && matchesType && matchesMonth;
+            });
+            
+            const tableBody = document.getElementById('transactionsTableBody');
+            tableBody.innerHTML = '';
+            
+            if (filteredData.length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="4" class="px-6 py-12 text-center text-gray-500">No transactions match your filters.</td></tr>';
+                return;
+            }
+            
+            filteredData.reverse().forEach(tx => {
+                const row = document.createElement('tr');
+                const amountClass = tx.type === 'Income' ? 'text-green-600' : 'text-red-600';
+                const amount = tx.type === 'Income' ? tx.amount : (tx.amount);
+                
+                row.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">${tx.date.toLocaleDateString('en-CA')}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">${tx.category}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 truncate" title="${tx.note || ''}">${tx.note || 'N/A'}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-right font-medium ${amountClass}">${currencyFormatter.format(amount)}</td>
+                `;
+                tableBody.appendChild(row);
+            });
+        }
+        
+        function setupSimulatorInputs() {
+            document.getElementById('simInitialSavings').addEventListener('input', updateSimulator);
+            
+            const simIncome = document.getElementById('simIncome');
+            const simIncomeRange = document.getElementById('simIncomeRange');
+            simIncome.addEventListener('input', () => {
+                simIncomeRange.value = simIncome.value;
+                updateSimulator();
+            });
+            simIncomeRange.addEventListener('input', () => {
+                simIncome.value = simIncomeRange.value;
+                updateSimulator();
+            });
+
+            const simMonths = document.getElementById('simMonths');
+            const simMonthsRange = document.getElementById('simMonthsRange');
+            simMonths.addEventListener('input', () => {
+                simMonthsRange.value = simMonths.value;
+                document.getElementById('simMonthsDisplay').innerText = simMonths.value;
+                updateSimulator();
+            });
+            simMonthsRange.addEventListener('input', () => {
+                simMonths.value = simMonthsRange.value;
+                document.getElementById('simMonthsDisplay').innerText = simMonthsRange.value;
+                updateSimulator();
+            });
+        }
+
+        function populateSimulator() {
+            const simIncome = document.getElementById('simIncome');
+            const simIncomeRange = document.getElementById('simIncomeRange');
+            const avgIncome = Math.round(baselineAvgIncome);
+            simIncome.value = avgIncome;
+            simIncomeRange.value = avgIncome;
+            simIncomeRange.max = Math.max(10000, avgIncome * 2);
+
+            const sortedExpenses = Object.entries(baselineAvgExpenses)
+                .sort(([,a], [,b]) => b - a);
+                
+            const topExpenses = sortedExpenses.slice(0, TOP_EXPENSE_CATEGORIES_COUNT);
+            let otherExpenses = sortedExpenses.slice(TOP_EXPENSE_CATEGORIES_COUNT)
+                .reduce((acc, [, amount]) => acc + amount, 0);
+
+            const inputsContainer = document.getElementById('simExpenseInputs');
+            inputsContainer.innerHTML = '';
+            
+            const createExpenseInput = (id, label, value) => {
+                const avgValue = Math.round(value);
+                const maxValue = Math.max(5000, avgValue * 3);
+                
+                const div = document.createElement('div');
+                div.innerHTML = `
+                    <label for="sim-${id}" class="block text-sm font-medium text-gray-700">${label} (€)</label>
+                    <div class="flex items-center space-x-2">
+                        <input type="range" id="sim-${id}-range" min="0" max="${maxValue}" step="10" value="${avgValue}" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer expense-range">
+                        <input type="number" id="sim-${id}" value="${avgValue}" class="w-28 p-2 border border-gray-300 rounded-md shadow-sm expense-input">
+                    </div>
+                `;
+                
+                const inputNum = div.querySelector(`#sim-${id}`);
+                const inputRange = div.querySelector(`#sim-${id}-range`);
+                
+                inputNum.addEventListener('input', () => {
+                    inputRange.value = inputNum.value;
+                    updateSimulator();
+                });
+                inputRange.addEventListener('input', () => {
+                    inputNum.value = inputRange.value;
+                    updateSimulator();
+                });
+                
+                return div;
+            };
+
+            topExpenses.forEach(([category, amount]) => {
+                const id = category.toLowerCase().replace(/[^a-z0-9]/g, '');
+                inputsContainer.appendChild(createExpenseInput(id, category, amount));
+            });
+            
+            if(otherExpenses > 0) {
+                 inputsContainer.appendChild(createExpenseInput('other', 'Other Expenses', otherExpenses));
+            }
+
+            updateSimulator();
+        }
+
+        function updateSimulator() {
+            if (!document.getElementById('simulator')) {
+                return; 
+            }
+            const initialSavings = parseFloat(document.getElementById('simInitialSavings').value) || 0;
+            const income = parseFloat(document.getElementById('simIncome').value) || 0;
+            const months = parseInt(document.getElementById('simMonths').value) || 24;
+            
+            let totalExpenses = 0;
+            document.querySelectorAll('.expense-input').forEach(input => {
+                totalExpenses += parseFloat(input.value) || 0;
+            });
+            
+            const monthlySavings = income - totalExpenses;
+            
+            const baselineMonthlySavings = baselineAvgIncome - Object.values(baselineAvgExpenses).reduce((a, b) => a + b, 0);
+            
+            let baselineProjection = [];
+            let simulatedProjection = [];
+            let currentBaseline = initialSavings;
+            let currentSimulated = initialSavings;
+            
+            const labels = [];
+            for(let i = 0; i <= months; i++) {
+                labels.push(`Month ${i}`);
+                if (i === 0) {
+                    baselineProjection.push(initialSavings);
+                    simulatedProjection.push(initialSavings);
+                } else {
+                    currentBaseline += baselineMonthlySavings;
+                    currentSimulated += monthlySavings;
+                    baselineProjection.push(currentBaseline);
+                    simulatedProjection.push(currentSimulated);
+                }
+            }
+            
+            document.getElementById('simMonthlySavings').innerText = currencyFormatter.format(monthlySavings);
+            document.getElementById('simTotalSavings').innerText = currencyFormatter.format(currentSimulated);
+
+            const ctx = document.getElementById('simulatorChart').getContext('2d');
+            if (simulatorChart) simulatorChart.destroy();
+            simulatorChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Simulated Projection',
+                            data: simulatedProjection,
+                            borderColor: '#3b82f6',
+                            backgroundColor: '#3b82f620',
+                            fill: true,
+                            tension: 0.1
+                        },
+                         {
+                            label: 'Baseline Projection',
+                            data: baselineProjection,
+                            borderColor: '#6b7280',
+                            backgroundColor: '#6b728020',
+                            fill: false,
+                            borderDash: [5, 5],
+                            tension: 0.1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            ticks: {
+                                callback: value => currencyFormatter.format(value)
+                            }
+                        }
+                    },
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: context => `${context.dataset.label}: ${currencyFormatter.format(context.raw)}`
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+    </script>
+</body>
+</html>
