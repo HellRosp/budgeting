@@ -156,7 +156,12 @@
                         </p>
                         <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
                             <div class="lg:col-span-1 space-y-6">
-                                <h3 class="text-xl font-semibold text-gray-800">Adjust Your Monthly Budget</h3>
+                                <div class="flex justify-between items-center">
+                                    <h3 class="text-xl font-semibold text-gray-800">Adjust Your Monthly Budget</h3>
+                                    <button id="resetSimulatorBtn" class="py-1 px-3 bg-gray-200 text-gray-700 rounded-md text-sm font-medium hover:bg-gray-300">
+                                        Reset
+                                    </button>
+                                </div>
                                 <div>
                                     <label for="simInitialSavings" class="block text-sm font-medium text-gray-700">Starting Savings (€)</label>
                                     <input type="number" id="simInitialSavings" value="0" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
@@ -377,6 +382,8 @@
             setupFilters();
             setupSimulatorInputs();
             populateDashboardData();
+            populateSimulator();
+            updateSimulator();
         }
 
         function setupTabs() {
@@ -509,7 +516,6 @@
             document.getElementById('netSavings').innerText = currencyFormatter.format(totalIncome - totalExpenses);
             
             populateFilters(Array.from(uniqueCategories), Array.from(uniqueMonthsForFilter));
-            populateSimulator();
             renderTransactionsTable();
         }
 
@@ -757,6 +763,18 @@
                 document.getElementById('simMonthsDisplay').innerText = simMonthsRange.value;
                 updateSimulator();
             });
+            
+            document.getElementById('resetSimulatorBtn').addEventListener('click', () => {
+                document.getElementById('simInitialSavings').value = 0;
+                
+                document.getElementById('simMonths').value = 24;
+                document.getElementById('simMonthsRange').value = 24;
+                document.getElementById('simMonthsDisplay').innerText = 24;
+                
+                populateSimulator(); 
+                
+                updateSimulator();
+            });
         }
 
         function populateSimulator() {
@@ -813,8 +831,6 @@
             if(otherExpenses > 0) {
                  inputsContainer.appendChild(createExpenseInput('other', 'Other Expenses', otherExpenses));
             }
-
-            updateSimulator();
         }
 
         function updateSimulator() {
@@ -907,3 +923,4 @@
     </script>
 </body>
 </html>
+
