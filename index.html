@@ -98,6 +98,38 @@
             height: 100%;
             transition: width 0.5s ease-in-out;
         }
+        /* Custom Checkbox Style */
+        .custom-checkbox {
+            width: 1.25rem;
+            height: 1.25rem;
+            border-radius: 0.25rem;
+            border: 1px solid #d1d5db;
+            appearance: none;
+            cursor: pointer;
+            position: relative;
+            background-color: white;
+        }
+        .custom-checkbox:checked {
+            background-color: #2563eb;
+            border-color: #2563eb;
+        }
+        .custom-checkbox:checked::after {
+            content: '✓';
+            position: absolute;
+            color: white;
+            font-size: 0.875rem;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+        }
+        .custom-checkbox:disabled {
+            background-color: #e5e7eb;
+            border-color: #d1d5db;
+            cursor: not-allowed;
+        }
+        .custom-checkbox:disabled::after {
+             color: #9ca3af;
+        }
     </style>
 </head>
 <body class="bg-gray-50 text-gray-800">
@@ -226,7 +258,7 @@
                     <section class="bg-white p-6 rounded-xl shadow-md border border-gray-100">
                         <h2 class="text-2xl font-semibold mb-4 text-gray-900">Yearly Budget Tracker</h2>
                         <p class="text-base text-gray-700 mb-6">
-                            Define your target monthly budget for each category. We'll multiply it by 12 to create an Annual Budget and track how much of it you have already consumed in the selected year based on your actual transactions.
+                            Define your target monthly budget. Use the checkboxes to include/exclude specific categories. Excluded categories are automatically grouped into the "Other" budget below.
                         </p>
                         
                         <div class="flex items-center mb-8">
@@ -245,9 +277,17 @@
                                         Reset
                                     </button>
                                 </div>
-                                <p class="text-xs text-gray-500 mb-4">Enter your target monthly spend. Annual budget is calculated automatically.</p>
+                                <p class="text-xs text-gray-500 mb-4">Uncheck to move category to "Other".</p>
                                 <div id="yearlyBudgetInputs" class="space-y-3 max-h-[600px] overflow-y-auto pr-2">
                                     <!-- Inputs generated here -->
+                                </div>
+                                <!-- Fixed "Other" Input Area -->
+                                <div class="pt-4 border-t border-gray-200">
+                                    <div class="flex items-center mb-1 space-x-2 bg-gray-100 p-2 rounded">
+                                         <input type="checkbox" class="custom-checkbox" id="cb-Other" checked disabled data-category="Other">
+                                        <label for="yb-Other" class="text-sm font-bold text-gray-700 truncate flex-1">Other (Aggregated)</label>
+                                        <input type="number" id="yb-Other" class="w-24 p-1 border border-gray-300 rounded text-sm text-right yb-input bg-white" placeholder="0" data-category="Other">
+                                    </div>
                                 </div>
                             </div>
 
@@ -1330,13 +1370,22 @@
             if (sortedYears.length > 0) yearSelect.value = sortedYears[0];
             
             yearSelect.addEventListener('change', updateYearlyBudgetAnalysis);
+            document.getElementById('yb-Other').addEventListener('input', updateYearlyBudgetAnalysis);
             
              document.getElementById('resetYearlyBudgetBtn').addEventListener('click', () => {
                 const inputs = document.querySelectorAll('.yb-input');
                 inputs.forEach(input => {
                     const category = input.dataset.category;
-                    if (baselineAvgExpenses[category]) {
-                        input.value = Math.round(baselineAvgExpenses[category]);
+                    if (category !== 'Other') {
+                         // Checkbox default is true
+                        const checkbox = document.getElementById(`cb-${category}`);
+                        if(checkbox) checkbox.checked = true;
+                        
+                        if (baselineAvgExpenses[category]) {
+                            input.value = Math.round(baselineAvgExpenses[category]);
+                        } else {
+                            input.value = 0;
+                        }
                     } else {
                         input.value = 0;
                     }
@@ -1352,37 +1401,41 @@
             const inputsContainer = document.getElementById('yearlyBudgetInputs');
             inputsContainer.innerHTML = '';
             
-            const categories = Object.keys(expenseCategoryData).sort();
+            // Filter out "Other" from the dynamic list if it exists in the source data
+            const categories = Object.keys(expenseCategoryData).filter(c => c !== 'Other').sort();
             
             categories.forEach(category => {
                 const div = document.createElement('div');
                 div.innerHTML = `
-                    <div class="flex justify-between items-center mb-1">
-                        <label for="yb-${category}" class="text-sm font-medium text-gray-700 truncate w-32" title="${category}">${category}</label>
+                    <div class="flex items-center mb-1 space-x-2">
+                        <input type="checkbox" class="custom-checkbox" id="cb-${category}" checked data-category="${category}">
+                        <label for="yb-${category}" class="text-sm font-medium text-gray-700 truncate flex-1" title="${category}">${category}</label>
                         <input type="number" id="yb-${category}" class="w-24 p-1 border border-gray-300 rounded text-sm text-right yb-input" placeholder="0" data-category="${category}">
                     </div>
                 `;
                 inputsContainer.appendChild(div);
                 
-                // Set default value based on historical average if available
-                const input = div.querySelector('input');
+                // Set default value
+                const input = div.querySelector('.yb-input');
                 if (baselineAvgExpenses[category]) {
                     input.value = Math.round(baselineAvgExpenses[category]);
                 }
                 
+                const checkbox = div.querySelector('.custom-checkbox');
+                
                 input.addEventListener('input', updateYearlyBudgetAnalysis);
+                checkbox.addEventListener('change', updateYearlyBudgetAnalysis);
             });
         }
 
         function updateYearlyBudgetAnalysis() {
             const selectedYear = parseInt(document.getElementById('yearlyBudgetYear').value);
-            const inputs = document.querySelectorAll('.yb-input');
             const barsContainer = document.getElementById('yearlyBudgetBars');
             barsContainer.innerHTML = '';
             
             let totalAnnualBudget = 0;
             let totalActualSpendYearly = 0;
-
+            
             // Calculate actuals for the selected year
             const yearlyActuals = {};
             allTransactions.forEach(tx => {
@@ -1391,44 +1444,46 @@
                     yearlyActuals[tx.category] += Math.abs(tx.amount);
                 }
             });
+
+            // 1. Handle Individual Categories (ONLY iterating through the container)
+            const categoryInputs = document.querySelectorAll('#yearlyBudgetInputs .yb-input');
+            let aggregatedOtherActuals = 0;
             
-            inputs.forEach(input => {
+            // Add any actual "Other" expenses from source data to aggregated total
+            if(yearlyActuals['Other']) {
+                aggregatedOtherActuals += yearlyActuals['Other'];
+            }
+
+            categoryInputs.forEach(input => {
                 const category = input.dataset.category;
+                const checkbox = document.getElementById(`cb-${category}`);
                 const monthlyBudget = parseFloat(input.value) || 0;
                 const annualBudget = monthlyBudget * 12;
                 const actualSpend = yearlyActuals[category] || 0;
-                
-                totalAnnualBudget += annualBudget;
-                totalActualSpendYearly += actualSpend;
 
-                let percentage = 0;
-                if (annualBudget > 0) {
-                    percentage = (actualSpend / annualBudget) * 100;
-                } else if (actualSpend > 0) {
-                    percentage = 100; // Spent money with 0 budget
+                if (checkbox && checkbox.checked) {
+                    // Category is ACTIVE -> Show bar, count budget
+                    totalAnnualBudget += annualBudget;
+                    totalActualSpendYearly += actualSpend;
+                    createProgressBar(barsContainer, category, actualSpend, annualBudget);
+                } else {
+                    // Category is INACTIVE -> Send actuals to 'Other' bucket
+                    aggregatedOtherActuals += actualSpend;
                 }
-                
-                const isOverBudget = actualSpend > annualBudget;
-                const barColor = isOverBudget ? 'bg-red-500' : 'bg-green-500';
-                const barWidth = Math.min(percentage, 100); // Cap visual width at 100%
-
-                const div = document.createElement('div');
-                div.className = 'relative';
-                div.innerHTML = `
-                    <div class="flex justify-between items-end mb-1">
-                        <span class="font-medium text-gray-800">${category}</span>
-                        <span class="text-sm ${isOverBudget ? 'text-red-600 font-bold' : 'text-gray-600'}">
-                            ${currencyFormatter.format(actualSpend)} / ${currencyFormatter.format(annualBudget)} (${percentage.toFixed(1)}%)
-                        </span>
-                    </div>
-                    <div class="progress-bar-bg">
-                        <div class="progress-bar-fill ${barColor}" style="width: ${barWidth}%"></div>
-                    </div>
-                `;
-                barsContainer.appendChild(div);
             });
 
-            // Calculate Income
+            // 2. Handle "Other" Bucket (Explicitly handling the separate input)
+            const otherInput = document.getElementById('yb-Other');
+            const otherMonthlyBudget = parseFloat(otherInput.value) || 0;
+            const otherAnnualBudget = otherMonthlyBudget * 12;
+            
+            totalAnnualBudget += otherAnnualBudget;
+            totalActualSpendYearly += aggregatedOtherActuals;
+            
+            // Always show "Other" bar at the bottom
+             createProgressBar(barsContainer, "Other (Aggregated)", aggregatedOtherActuals, otherAnnualBudget);
+
+            // 3. Update Summary
             let totalIncomeYearly = 0;
             allTransactions.forEach(tx => {
                  if (tx.date.getFullYear() === selectedYear && tx.type === 'Income') {
@@ -1436,12 +1491,10 @@
                  }
             });
 
-            // Update DOM
             document.getElementById('ybTotalBudget').innerText = currencyFormatter.format(totalAnnualBudget);
             document.getElementById('ybTotalIncome').innerText = currencyFormatter.format(totalIncomeYearly);
             document.getElementById('ybNetPosition').innerText = currencyFormatter.format(totalIncomeYearly - totalAnnualBudget);
             
-            // Style Net Position
             const netPosEl = document.getElementById('ybNetPosition');
             if(totalIncomeYearly - totalAnnualBudget >= 0) {
                 netPosEl.classList.remove('text-red-600');
@@ -1450,6 +1503,34 @@
                  netPosEl.classList.remove('text-green-600');
                 netPosEl.classList.add('text-red-600');
             }
+        }
+        
+        function createProgressBar(container, label, actual, budget) {
+            let percentage = 0;
+            if (budget > 0) {
+                percentage = (actual / budget) * 100;
+            } else if (actual > 0) {
+                percentage = 100; 
+            }
+            
+            const isOverBudget = actual > budget;
+            const barColor = isOverBudget ? 'bg-red-500' : 'bg-green-500';
+            const barWidth = Math.min(percentage, 100);
+
+            const div = document.createElement('div');
+            div.className = 'relative';
+            div.innerHTML = `
+                <div class="flex justify-between items-end mb-1">
+                    <span class="font-medium text-gray-800">${label}</span>
+                    <span class="text-sm ${isOverBudget ? 'text-red-600 font-bold' : 'text-gray-600'}">
+                        ${currencyFormatter.format(actual)} / ${currencyFormatter.format(budget)} (${percentage.toFixed(1)}%)
+                    </span>
+                </div>
+                <div class="progress-bar-bg">
+                    <div class="progress-bar-fill ${barColor}" style="width: ${barWidth}%"></div>
+                </div>
+            `;
+            container.appendChild(div);
         }
 
     </script>
