@@ -9,8 +9,8 @@
     <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.0/papaparse.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <!-- Chosen Palette: Calm Neutrals (Grays, Blues, with Green/Red accents) -->
-    <!-- Application Structure Plan: A 3-tab SPA (Dashboard, Budget Simulator, Transactions). Dashboard provides a summary of past data (KPIs, trends, breakdown). Budget Simulator allows interactive projection of future savings based on adjustable income/expense variables, directly addressing the user's core request. Transactions tab provides a filterable drill-down of all raw data. This structure separates analysis from simulation for a clear, task-oriented user flow. -->
-    <!-- Visualization & Content Choices: 1. KPIs (Total Income/Expense/Savings): Inform -> HTML Cards -> No interaction -> Simple, high-level summary. 2. Monthly Trend: Show Change -> Chart.js Line Chart -> Hover tooltips -> Shows performance over time. 3. Expense Breakdown: Show Proportions -> Chart.js Doughnut Chart -> Hover/Click -> Answers 'where is money going?'. 4. Simulator Inputs: Interact -> HTML Sliders/Inputs -> User input -> Powers the simulation model. 5. Simulator Projection: Show Impact -> Chart.js Line Chart -> Updates on input -> Directly visualizes the 'what-if' scenarios requested. 6. Transaction List: Organize/Drill-down -> Filterable HTML Table -> User filter -> Provides access to raw data details. -->
+    <!-- Application Structure Plan: A 4-tab SPA (Dashboard, Yearly Budget, Budget Simulator, Transactions). -->
+    <!-- Visualization & Content Choices: Yearly Budget uses interactive inputs on the left and visual progress bars on the right to show actual vs. budget performance. -->
     <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
     <style>
         body {
@@ -88,6 +88,16 @@
         .filter-btn-inactive:hover {
             background-color: #f9fafb;
         }
+        .progress-bar-bg {
+            background-color: #e5e7eb;
+            border-radius: 9999px;
+            overflow: hidden;
+            height: 1.5rem;
+        }
+        .progress-bar-fill {
+            height: 100%;
+            transition: width 0.5s ease-in-out;
+        }
     </style>
 </head>
 <body class="bg-gray-50 text-gray-800">
@@ -115,10 +125,13 @@
                 <p class="text-lg text-gray-600">Analyze your spending and project your savings.</p>
             </header>
 
-            <div class="mb-6 border-b border-gray-200">
+            <div class="mb-6 border-b border-gray-200 overflow-x-auto">
                 <nav class="flex flex-wrap -mb-px" aria-label="Tabs">
                     <button data-tab="dashboard" class="tab-btn whitespace-nowrap py-4 px-6 border-b-2 font-medium text-lg tab-btn-active">
                         Dashboard
+                    </button>
+                    <button data-tab="yearly-budget" class="tab-btn whitespace-nowrap py-4 px-6 border-b-2 font-medium text-lg tab-btn-inactive">
+                        Yearly Budget
                     </button>
                     <button data-tab="simulator" class="tab-btn whitespace-nowrap py-4 px-6 border-b-2 font-medium text-lg tab-btn-inactive">
                         Budget Simulator
@@ -193,7 +206,7 @@
                                 <label class="block text-sm font-medium text-gray-700">Chart Mode</label>
                                 <div class="mt-1 flex rounded-md shadow-sm">
                                     <button id="toggleMonthly" class="px-4 py-2 text-sm font-medium bg-blue-600 text-white border border-blue-600 rounded-l-md hover:bg-blue-700">
-                                        Monthly
+                                        Individual Values
                                     </button>
                                     <button id="toggleCumulative" class="px-4 py-2 text-sm font-medium bg-white text-gray-700 border border-gray-300 rounded-r-md hover:bg-gray-50">
                                         Cumulative
@@ -206,7 +219,64 @@
                             <canvas id="monthlyTrendChart"></canvas>
                         </div>
                     </section>
+                </div>
 
+                <!-- NEW YEARLY BUDGET TAB -->
+                <div id="yearly-budget" class="tab-content hidden space-y-8">
+                    <section class="bg-white p-6 rounded-xl shadow-md border border-gray-100">
+                        <h2 class="text-2xl font-semibold mb-4 text-gray-900">Yearly Budget Tracker</h2>
+                        <p class="text-base text-gray-700 mb-6">
+                            Define your target monthly budget for each category. We'll multiply it by 12 to create an Annual Budget and track how much of it you have already consumed in the selected year based on your actual transactions.
+                        </p>
+                        
+                        <div class="flex items-center mb-8">
+                            <label for="yearlyBudgetYear" class="block text-sm font-medium text-gray-700 mr-4">Select Year to Track:</label>
+                            <select id="yearlyBudgetYear" class="block w-32 p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                                <!-- Years populated dynamically -->
+                            </select>
+                        </div>
+
+                        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                            <!-- Left Col: Inputs -->
+                            <div class="lg:col-span-1 space-y-4 bg-gray-50 p-6 rounded-lg border border-gray-200">
+                                <div class="flex justify-between items-center mb-4">
+                                    <h3 class="text-lg font-semibold text-gray-800">Set Monthly Budgets (€)</h3>
+                                    <button id="resetYearlyBudgetBtn" class="py-1 px-3 bg-gray-200 text-gray-700 rounded-md text-sm font-medium hover:bg-gray-300 transition-colors duration-150">
+                                        Reset
+                                    </button>
+                                </div>
+                                <p class="text-xs text-gray-500 mb-4">Enter your target monthly spend. Annual budget is calculated automatically.</p>
+                                <div id="yearlyBudgetInputs" class="space-y-3 max-h-[600px] overflow-y-auto pr-2">
+                                    <!-- Inputs generated here -->
+                                </div>
+                            </div>
+
+                            <!-- Right Col: Visualization -->
+                            <div class="lg:col-span-2 space-y-6">
+                                <h3 class="text-lg font-semibold text-gray-800 mb-4">Budget Consumption</h3>
+                                <div id="yearlyBudgetBars" class="space-y-6">
+                                    <!-- Progress bars generated here -->
+                                </div>
+                            </div>
+                        </div>
+
+                         <!-- NEW SUMMARY FOOTER -->
+                         <div class="mt-8 p-6 bg-blue-50 rounded-lg border border-blue-100 grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div>
+                                <h4 class="text-sm font-medium text-gray-600">Total Annual Budget (Planned Costs)</h4>
+                                <p id="ybTotalBudget" class="text-2xl font-bold text-gray-900">€0.00</p>
+                            </div>
+                            <div>
+                                <h4 class="text-sm font-medium text-gray-600">Total Income (Actual for Selected Year)</h4>
+                                <p id="ybTotalIncome" class="text-2xl font-bold text-green-600">€0.00</p>
+                            </div>
+                            <div>
+                                <h4 class="text-sm font-medium text-gray-600">Projected Balance (Income - Budget)</h4>
+                                <p id="ybNetPosition" class="text-2xl font-bold text-blue-600">€0.00</p>
+                            </div>
+                        </div>
+
+                    </section>
                 </div>
 
                 <div id="simulator" class="tab-content hidden space-y-8">
@@ -387,6 +457,7 @@
         let monthlyData = {};
         let expenseCategoryData = {};
         let incomeCategoryData = {};
+        let availableYears = new Set();
         
         let monthlyTrendChart = null;
         let expenseBreakdownChart = null;
@@ -398,7 +469,7 @@
         const WEEKLY_DIVISOR = 4.3333;
         
         let minDate, maxDate;
-        let trendChartMode = 'monthly';
+        let trendChartMode = 'individual';
         let aggregationUnit = 'monthly';
 
         const currencyFormatter = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' });
@@ -509,6 +580,7 @@
             renderMonthlyTrendChart();
             renderExpenseBreakdownChart(expenseCategoryData);
             setupCategoryFilters(expenseCategoryData);
+            setupYearlyBudget();
         }
 
         function setupTabs() {
@@ -601,6 +673,7 @@
             monthlyData = {};
             expenseCategoryData = {};
             incomeCategoryData = {};
+            availableYears = new Set();
 
             const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
             let uniqueMonths = new Set();
@@ -608,8 +681,11 @@
             let uniqueMonthsForFilter = new Set();
 
             allTransactions.forEach(tx => {
-                const monthYear = `${tx.date.getFullYear()}-${String(tx.date.getMonth() + 1).padStart(2, '0')}`;
-                const monthLabel = `${monthNames[tx.date.getMonth()]} ${tx.date.getFullYear()}`;
+                const year = tx.date.getFullYear();
+                availableYears.add(year);
+                
+                const monthYear = `${year}-${String(tx.date.getMonth() + 1).padStart(2, '0')}`;
+                const monthLabel = `${monthNames[tx.date.getMonth()]} ${year}`;
                 uniqueMonths.add(monthYear);
                 uniqueMonthsForFilter.add(monthLabel);
 
@@ -754,7 +830,7 @@
             const toggleCumulativeBtn = document.getElementById('toggleCumulative');
             
             toggleMonthlyBtn.addEventListener('click', () => {
-                trendChartMode = 'monthly';
+                trendChartMode = 'individual';
                 toggleMonthlyBtn.classList.add('bg-blue-600', 'text-white');
                 toggleMonthlyBtn.classList.remove('bg-white', 'text-gray-700');
                 toggleCumulativeBtn.classList.add('bg-white', 'text-gray-700');
@@ -1237,7 +1313,145 @@
             });
         }
 
+        /* --- YEARLY BUDGET LOGIC --- */
+        
+        function setupYearlyBudget() {
+            const yearSelect = document.getElementById('yearlyBudgetYear');
+            yearSelect.innerHTML = '';
+            
+            const sortedYears = Array.from(availableYears).sort().reverse();
+            sortedYears.forEach(year => {
+                const option = document.createElement('option');
+                option.value = year;
+                option.textContent = year;
+                yearSelect.appendChild(option);
+            });
+            
+            if (sortedYears.length > 0) yearSelect.value = sortedYears[0];
+            
+            yearSelect.addEventListener('change', updateYearlyBudgetAnalysis);
+            
+             document.getElementById('resetYearlyBudgetBtn').addEventListener('click', () => {
+                const inputs = document.querySelectorAll('.yb-input');
+                inputs.forEach(input => {
+                    const category = input.dataset.category;
+                    if (baselineAvgExpenses[category]) {
+                        input.value = Math.round(baselineAvgExpenses[category]);
+                    } else {
+                        input.value = 0;
+                    }
+                });
+                updateYearlyBudgetAnalysis();
+            });
+
+            renderYearlyBudgetInputs();
+            updateYearlyBudgetAnalysis();
+        }
+
+        function renderYearlyBudgetInputs() {
+            const inputsContainer = document.getElementById('yearlyBudgetInputs');
+            inputsContainer.innerHTML = '';
+            
+            const categories = Object.keys(expenseCategoryData).sort();
+            
+            categories.forEach(category => {
+                const div = document.createElement('div');
+                div.innerHTML = `
+                    <div class="flex justify-between items-center mb-1">
+                        <label for="yb-${category}" class="text-sm font-medium text-gray-700 truncate w-32" title="${category}">${category}</label>
+                        <input type="number" id="yb-${category}" class="w-24 p-1 border border-gray-300 rounded text-sm text-right yb-input" placeholder="0" data-category="${category}">
+                    </div>
+                `;
+                inputsContainer.appendChild(div);
+                
+                // Set default value based on historical average if available
+                const input = div.querySelector('input');
+                if (baselineAvgExpenses[category]) {
+                    input.value = Math.round(baselineAvgExpenses[category]);
+                }
+                
+                input.addEventListener('input', updateYearlyBudgetAnalysis);
+            });
+        }
+
+        function updateYearlyBudgetAnalysis() {
+            const selectedYear = parseInt(document.getElementById('yearlyBudgetYear').value);
+            const inputs = document.querySelectorAll('.yb-input');
+            const barsContainer = document.getElementById('yearlyBudgetBars');
+            barsContainer.innerHTML = '';
+            
+            let totalAnnualBudget = 0;
+            let totalActualSpendYearly = 0;
+
+            // Calculate actuals for the selected year
+            const yearlyActuals = {};
+            allTransactions.forEach(tx => {
+                if (tx.date.getFullYear() === selectedYear && tx.type === 'Expense') {
+                    if (!yearlyActuals[tx.category]) yearlyActuals[tx.category] = 0;
+                    yearlyActuals[tx.category] += Math.abs(tx.amount);
+                }
+            });
+            
+            inputs.forEach(input => {
+                const category = input.dataset.category;
+                const monthlyBudget = parseFloat(input.value) || 0;
+                const annualBudget = monthlyBudget * 12;
+                const actualSpend = yearlyActuals[category] || 0;
+                
+                totalAnnualBudget += annualBudget;
+                totalActualSpendYearly += actualSpend;
+
+                let percentage = 0;
+                if (annualBudget > 0) {
+                    percentage = (actualSpend / annualBudget) * 100;
+                } else if (actualSpend > 0) {
+                    percentage = 100; // Spent money with 0 budget
+                }
+                
+                const isOverBudget = actualSpend > annualBudget;
+                const barColor = isOverBudget ? 'bg-red-500' : 'bg-green-500';
+                const barWidth = Math.min(percentage, 100); // Cap visual width at 100%
+
+                const div = document.createElement('div');
+                div.className = 'relative';
+                div.innerHTML = `
+                    <div class="flex justify-between items-end mb-1">
+                        <span class="font-medium text-gray-800">${category}</span>
+                        <span class="text-sm ${isOverBudget ? 'text-red-600 font-bold' : 'text-gray-600'}">
+                            ${currencyFormatter.format(actualSpend)} / ${currencyFormatter.format(annualBudget)} (${percentage.toFixed(1)}%)
+                        </span>
+                    </div>
+                    <div class="progress-bar-bg">
+                        <div class="progress-bar-fill ${barColor}" style="width: ${barWidth}%"></div>
+                    </div>
+                `;
+                barsContainer.appendChild(div);
+            });
+
+            // Calculate Income
+            let totalIncomeYearly = 0;
+            allTransactions.forEach(tx => {
+                 if (tx.date.getFullYear() === selectedYear && tx.type === 'Income') {
+                     totalIncomeYearly += tx.amount;
+                 }
+            });
+
+            // Update DOM
+            document.getElementById('ybTotalBudget').innerText = currencyFormatter.format(totalAnnualBudget);
+            document.getElementById('ybTotalIncome').innerText = currencyFormatter.format(totalIncomeYearly);
+            document.getElementById('ybNetPosition').innerText = currencyFormatter.format(totalIncomeYearly - totalAnnualBudget);
+            
+            // Style Net Position
+            const netPosEl = document.getElementById('ybNetPosition');
+            if(totalIncomeYearly - totalAnnualBudget >= 0) {
+                netPosEl.classList.remove('text-red-600');
+                netPosEl.classList.add('text-green-600');
+            } else {
+                 netPosEl.classList.remove('text-green-600');
+                netPosEl.classList.add('text-red-600');
+            }
+        }
+
     </script>
 </body>
 </html>
-
